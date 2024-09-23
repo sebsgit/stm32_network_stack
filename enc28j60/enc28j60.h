@@ -32,7 +32,8 @@
 #define ENC28_CR_MAC_ADD5	(0x00)		/* MAC address byte 4 */
 #define ENC28_CR_MAC_ADD6	(0x01)		/* MAC address byte 5 */
 
-#define ENC28_ECON1_BANK_SEL(n)		(n)		/* Bank select */
+#define ENC28_ECON1_BANK_SEL(n)		(n)		/* Bank select value */
+#define ENC28_ECON1_BSEL			(0x3)	/* Bank select register bit mask */
 #define ENC28_ECON1_RXEN			(1 << 2)	/* Receive enable bit */
 #define ENC28_ECON1_TXRTS			(1 << 3)	/* Transmit request to send */
 #define ENC28_ECON1_CSUM_EN			(1 << 4)	/* DMA checksum enable */
@@ -124,5 +125,13 @@ extern ENC28_CommandStatus enc28_prepare_write_ctl_reg(uint16_t *out, uint8_t re
  * @return Status of the operation
  * */
 extern ENC28_CommandStatus enc28_do_write_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id, uint8_t reg_value);
+
+extern ENC28_CommandStatus enc28_prepare_set_bits_ctl_reg(uint16_t *out, uint8_t reg_id, uint8_t mask);
+
+extern ENC28_CommandStatus enc28_prepare_clear_bits_ctl_reg(uint16_t *out, uint8_t reg_id, uint8_t mask);
+
+extern ENC28_CommandStatus enc28_do_set_bits_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id, uint8_t mask);
+
+extern ENC28_CommandStatus enc28_do_clear_bits_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id, uint8_t mask);
 
 #endif /* INC_ENC28J60_H_ */

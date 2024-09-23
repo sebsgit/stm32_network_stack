@@ -2,6 +2,13 @@
 
 #define EXIT_IF_ERR(s) if((s) != ENC28_OK) { return (s); }
 
+/*
+ * Datasheet for ENC28J60, page 12: " (...) The register at address 1Ah in
+ * each bank is reserved; read and write operations
+ * should not be performed on this register."
+* */
+#define CHECK_RESERVED_REG(reg_id) if ((reg_id) == 0x1A) { return ENC28_INVALID_REGISTER; }
+
 static ENC28_CommandStatus priv_enc28_do_buffer_register_init(ENC28_SPI_Context *ctx)
 {
 	uint8_t addr_lo = ENC28_CONF_RX_ADDRESS_START & 0xFF;
@@ -71,19 +78,11 @@ ENC28_CommandStatus enc28_do_init(ENC28_SPI_Context *ctx)
 
 ENC28_CommandStatus enc28_prepare_read_ctl_reg(uint8_t *out, uint8_t reg_id)
 {
+	CHECK_RESERVED_REG(reg_id);
+
 	if (!out)
 	{
 		return ENC28_INVALID_PARAM;
-	}
-
-	/*
-	 * Datasheet for ENC28J60, page 12: " (...) The register at address 1Ah in
- 	 * each bank is reserved; read and write operations
- 	 * should not be performed on this register."
-	 * */
-	if (reg_id == 0x1A)
-	{
-		return ENC28_INVALID_REGISTER;
 	}
 
 	*out = (ENC28_OP_RCR << ENC28_SPI_ARG_BITS) | (reg_id & ENC28_SPI_ARG_MASK);
@@ -127,18 +126,11 @@ ENC28_CommandStatus enc28_do_read_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id
 
 ENC28_CommandStatus enc28_prepare_write_ctl_reg(uint16_t *out, uint8_t reg_id, uint8_t in)
 {
+	CHECK_RESERVED_REG(reg_id);
+
 	if (!out)
 	{
 		return ENC28_INVALID_PARAM;
-	}
-	/*
-	 * Datasheet for ENC28J60, page 12: " (...) The register at address 1Ah in
- 	 * each bank is reserved; read and write operations
- 	 * should not be performed on this register."
-	 * */
-	if (reg_id == 0x1A)
-	{
-		return ENC28_INVALID_REGISTER;
 	}
 
 	const uint8_t command_byte = (ENC28_OP_WCR << ENC28_SPI_ARG_BITS) | (reg_id & ENC28_SPI_ARG_MASK);
