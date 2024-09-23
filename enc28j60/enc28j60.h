@@ -126,12 +126,42 @@ extern ENC28_CommandStatus enc28_prepare_write_ctl_reg(uint16_t *out, uint8_t re
  * */
 extern ENC28_CommandStatus enc28_do_write_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id, uint8_t reg_value);
 
+/**
+ * @brief Prepares the "Set Bits" command for the specified register
+ * @param out The output buffer
+ * @param reg_id The register ID
+ * @param mask The bits to set in @p reg_id
+ * @return Status of the operation
+ * */
 extern ENC28_CommandStatus enc28_prepare_set_bits_ctl_reg(uint16_t *out, uint8_t reg_id, uint8_t mask);
 
+/**
+ * @brief Prepares the "Clear Bits" command for the specified register
+ * @param out The output buffer
+ * @param reg_id The register ID
+ * @param mask The bits to clear in @p reg_id
+ * @return Status of the operation
+ * */
 extern ENC28_CommandStatus enc28_prepare_clear_bits_ctl_reg(uint16_t *out, uint8_t reg_id, uint8_t mask);
 
+/**
+ * @brief Sets the bits of the specified register
+ * @param ctx The SPI communication context
+ * @param reg_id The register ID
+ * @param mask The bits to set
+ * @return Status of the operation
+ * */
 extern ENC28_CommandStatus enc28_do_set_bits_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id, uint8_t mask);
 
+/**
+ * @brief Clears the bits of the specified register
+ * @param ctx The SPI communication context
+ * @param reg_id The register ID
+ * @param mask The bits to clear
+ * @return Status of the operation
+ * */
 extern ENC28_CommandStatus enc28_do_clear_bits_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id, uint8_t mask);
+
+extern ENC28_CommandStatus enc28_select_register_bank(ENC28_SPI_Context *ctx, const uint8_t bank_id);
 
 #endif /* INC_ENC28J60_H_ */

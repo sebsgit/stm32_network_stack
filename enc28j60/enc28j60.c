@@ -166,3 +166,107 @@ ENC28_CommandStatus enc28_do_write_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_i
 
 	return ENC28_OK;
 }
+
+ENC28_CommandStatus enc28_prepare_set_bits_ctl_reg(uint16_t *out, uint8_t reg_id, uint8_t mask)
+{
+	CHECK_RESERVED_REG(reg_id);
+
+	if (!out)
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	const uint8_t command_byte = (ENC28_OP_BFS << ENC28_SPI_ARG_BITS) | (reg_id & ENC28_SPI_ARG_MASK);
+	*out = (command_byte << 8) | mask;
+
+	return ENC28_OK;
+}
+
+ENC28_CommandStatus enc28_prepare_clear_bits_ctl_reg(uint16_t *out, uint8_t reg_id, uint8_t mask)
+{
+	CHECK_RESERVED_REG(reg_id);
+
+	if (!out)
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	const uint8_t command_byte = (ENC28_OP_BFC << ENC28_SPI_ARG_BITS) | (reg_id & ENC28_SPI_ARG_MASK);
+	*out = (command_byte << 8) | mask;
+
+	return ENC28_OK;
+}
+
+ENC28_CommandStatus enc28_do_set_bits_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id, uint8_t mask)
+{
+	if (!ctx)
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	if ((!ctx->nss_pin_op) || (!ctx->spi_in_op) || (!ctx->spi_out_op))
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	{
+		uint16_t cmd_buff;
+		const ENC28_CommandStatus status = enc28_prepare_set_bits_ctl_reg(&cmd_buff, reg_id, mask);
+		if (status != ENC28_OK)
+		{
+			return status;
+		}
+
+		ctx->nss_pin_op(0);
+		ctx->spi_out_op((const uint8_t*)&cmd_buff, 2);
+		ctx->nss_pin_op(1);
+	}
+
+	return ENC28_OK;
+}
+
+ENC28_CommandStatus enc28_do_clear_bits_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id, uint8_t mask)
+{
+	if (!ctx)
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	if ((!ctx->nss_pin_op) || (!ctx->spi_in_op) || (!ctx->spi_out_op))
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	{
+		uint16_t cmd_buff;
+		const ENC28_CommandStatus status = enc28_prepare_clear_bits_ctl_reg(&cmd_buff, reg_id, mask);
+		if (status != ENC28_OK)
+		{
+			return status;
+		}
+
+		ctx->nss_pin_op(0);
+		ctx->spi_out_op((const uint8_t*)&cmd_buff, 2);
+		ctx->nss_pin_op(1);
+	}
+
+	return ENC28_OK;
+}
+
+ENC28_CommandStatus enc28_select_register_bank(ENC28_SPI_Context *ctx, const uint8_t bank_id)
+{
+	if (bank_id >= 4)
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	uint8_t econ1_reg = 0;
+	ENC28_CommandStatus status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ECON1, &econ1_reg);
+	EXIT_IF_ERR(status);
+
+	econ1_reg &= ~(ENC28_ECON1_BSEL);
+	econ1_reg |= ENC28_ECON1_BANK_SEL(bank_id);
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ECON1, econ1_reg);
+
+	return status;
+}
