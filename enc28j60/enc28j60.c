@@ -55,23 +55,107 @@ static ENC28_CommandStatus priv_enc28_do_poll_estat_clk(ENC28_SPI_Context *ctx)
 	return ENC28_OK;
 }
 
-ENC28_CommandStatus enc28_do_init(ENC28_SPI_Context *ctx)
+static ENC28_CommandStatus priv_enc28_do_mac_init(const ENC28_MAC_Address mac_add, ENC28_SPI_Context *ctx)
 {
-	// 1. program the ERXST and ERXND pointers
-	// 2. program the ERXRDPT register
-	ENC28_CommandStatus status = priv_enc28_do_buffer_register_init(ctx);
+	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 2); //TODO do not hardcode 2
 	EXIT_IF_ERR(status);
 
-	// 3. program the "receive filters" in ERXFCON
+	{
+		const uint8_t macon1_mask = (1 << ENC28_MACON1_RXEN)
+								| (1 << ENC28_MACON1_RXPAUS)
+								| (1 << ENC28_MACON1_TXPAUS);
+
+		status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_MACON1, macon1_mask);
+		EXIT_IF_ERR(status);
+	}
+
+	{
+		const uint8_t macon3_mask = ENC28_CONF_MACON3_FRAME_PAD_MASK |
+					(1 << ENC28_MACON3_FULLDPX) |
+					(1 << ENC28_MACON3_TXCRCEN);
+		status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_MACON3, macon3_mask);
+		EXIT_IF_ERR(status);
+	}
+
+	{
+		const uint8_t macon4_mask = (1 << ENC28_MACON4_DEFER);
+		status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_MACON4, macon4_mask);
+		EXIT_IF_ERR(status);
+	}
+
+	{
+		const uint8_t max_fr_len_lo = ENC28_CONF_MAX_FRAME_LEN & 0xFF;
+		const uint8_t max_fr_len_hi = (ENC28_CONF_MAX_FRAME_LEN >> 8) & 0xFF;
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAMXFLL, max_fr_len_lo);
+		EXIT_IF_ERR(status);
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAMXFLH, max_fr_len_hi);
+		EXIT_IF_ERR(status);
+	}
+
+	{
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MABBIPG, ENC28_CONF_MABBIPG_BITS);
+		EXIT_IF_ERR(status);
+	}
+
+	{
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAIPGL, ENC28_CONF_MAIPGL_BITS);
+		EXIT_IF_ERR(status);
+	}
+
+	{
+		status = enc28_select_register_bank(ctx, 3);
+		EXIT_IF_ERR(status);
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAC_ADD1, mac_add.addr[0]);
+		EXIT_IF_ERR(status);
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAC_ADD2, mac_add.addr[1]);
+		EXIT_IF_ERR(status);
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAC_ADD3, mac_add.addr[2]);
+		EXIT_IF_ERR(status);
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAC_ADD4, mac_add.addr[3]);
+		EXIT_IF_ERR(status);
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAC_ADD5, mac_add.addr[4]);
+		EXIT_IF_ERR(status);
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAC_ADD6, mac_add.addr[5]);
+		EXIT_IF_ERR(status);
+	}
+
+	{
+		status = enc28_select_register_bank(ctx, 0);
+		EXIT_IF_ERR(status);
+	}
+
+	return ENC28_OK;
+}
+
+static ENC28_CommandStatus priv_enc28_do_phy_init(ENC28_SPI_Context *ctx)
+{
+	return ENC28_OK;
+}
+
+ENC28_CommandStatus enc28_do_init(const ENC28_MAC_Address mac_add, ENC28_SPI_Context *ctx)
+{
+	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 0);
+	EXIT_IF_ERR(status);
+
+	// program the ERXST and ERXND pointers
+	// program the ERXRDPT register
+	status = priv_enc28_do_buffer_register_init(ctx);
+	EXIT_IF_ERR(status);
+
+	// program the "receive filters" in ERXFCON
 	status = priv_enc28_do_receive_filter_init(ctx);
 	EXIT_IF_ERR(status);
 
-	// 4. poll ESTAT.CLKRDY before initialising MAC address
+	// poll ESTAT.CLKRDY before initialising MAC address
 	status = priv_enc28_do_poll_estat_clk(ctx);
 	EXIT_IF_ERR(status);
 
 	// MAC initialization
+	status = priv_enc28_do_mac_init(mac_add, ctx);
+	EXIT_IF_ERR(status);
+
 	// PHY initialization
+	status = priv_enc28_do_phy_init(ctx);
 
 	return status;
 }
@@ -269,4 +353,76 @@ ENC28_CommandStatus enc28_select_register_bank(ENC28_SPI_Context *ctx, const uin
 	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ECON1, econ1_reg);
 
 	return status;
+}
+
+ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ENC28_Wait_Micro wait_func, uint8_t reg_id, uint16_t *reg_value)
+{
+	CHECK_RESERVED_REG(reg_id);
+
+	if (!ctx)
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	if ((!ctx->nss_pin_op) || (!ctx->spi_in_op) || (!ctx->spi_out_op))
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	if (!wait_func)
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 2);
+	EXIT_IF_ERR(status);
+
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MIREGADR, reg_id);
+	EXIT_IF_ERR(status);
+
+	{
+		const uint8_t miird_mask = (1 << ENC28_MICMD_MIIRD);
+		status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_MICMD, miird_mask);
+		EXIT_IF_ERR(status);
+	}
+
+	wait_func(11);
+
+	{
+		status = enc28_select_register_bank(ctx, 3);
+		EXIT_IF_ERR(status);
+
+		while (status == ENC28_OK)
+		{
+			uint8_t mistat_value = 0;
+			status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MISTAT, &mistat_value);
+			if ((mistat_value & (1 << ENC28_MISTAT_BUSY)) == 0)
+			{
+				break;
+			}
+			wait_func(1);
+		}
+		EXIT_IF_ERR(status);
+	}
+
+	{
+		status = enc28_select_register_bank(ctx, 2);
+		EXIT_IF_ERR(status);
+
+		const uint8_t miird_mask = (1 << ENC28_MICMD_MIIRD);
+		status = enc28_do_clear_bits_ctl_reg(ctx, ENC28_CR_MICMD, miird_mask);
+		EXIT_IF_ERR(status);
+	}
+
+	{
+		uint8_t reg_val_lo = 0;
+		uint8_t reg_val_hi = 0;
+		status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MIRDL, &reg_val_lo);
+		EXIT_IF_ERR(status);
+		status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MIRDH, &reg_val_hi);
+		EXIT_IF_ERR(status);
+		*reg_value = (reg_val_hi << 8) | reg_val_lo;
+	}
+
+	return ENC28_OK;
 }
