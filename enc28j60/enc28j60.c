@@ -9,6 +9,7 @@
 * */
 #define CHECK_RESERVED_REG(reg_id) if ((reg_id) == 0x1A) { return ENC28_INVALID_REGISTER; }
 
+//TODO refactor : keep bank ID together with register name
 static uint8_t priv_enc28_curr_bank = 0;
 
 static uint8_t priv_enc28_is_mac_or_mii_reg(uint8_t reg_id)
@@ -20,6 +21,7 @@ static uint8_t priv_enc28_is_mac_or_mii_reg(uint8_t reg_id)
 				(reg_id == ENC28_CR_MACON4) ||
 				(reg_id == ENC28_CR_MABBIPG) ||
 				(reg_id == ENC28_CR_MAIPGL) ||
+				(reg_id == ENC28_CR_MAIPGH) ||
 				(reg_id == ENC28_CR_MAMXFLH) ||
 				(reg_id == ENC28_CR_MAMXFLL) ||
 				(reg_id == ENC28_CR_MICMD) ||
@@ -105,7 +107,6 @@ static ENC28_CommandStatus priv_enc28_do_mac_init(const ENC28_MAC_Address mac_ad
 
 	{
 		const uint8_t macon3_mask = ENC28_CONF_MACON3_FRAME_PAD_MASK |
-					(1 << ENC28_MACON3_FULLDPX) |
 					(1 << ENC28_MACON3_TXCRCEN);
 		status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_MACON3, macon3_mask);
 		EXIT_IF_ERR(status);
@@ -133,6 +134,9 @@ static ENC28_CommandStatus priv_enc28_do_mac_init(const ENC28_MAC_Address mac_ad
 
 	{
 		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAIPGL, ENC28_CONF_MAIPGL_BITS);
+		EXIT_IF_ERR(status);
+
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAIPGH, ENC28_CONF_MAIPGH_BITS);
 		EXIT_IF_ERR(status);
 	}
 
@@ -239,7 +243,7 @@ ENC28_CommandStatus enc28_do_read_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id
 		ctx->spi_out_op(&cmd_buff, 1);
 		if (skip_dummy_byte)
 		{
-			uint8_t buff[2];
+			uint8_t buff[2] = {0, 0};
 			ctx->spi_in_op(buff, 2);
 			*reg_value = buff[1];
 		}
@@ -289,8 +293,10 @@ ENC28_CommandStatus enc28_do_write_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_i
 		}
 
 		ctx->nss_pin_op(0);
+		//TODO add delay
 		uint8_t send_buff[2] = {(cmd_buff >> 8), cmd_buff & 0xFF};
 		ctx->spi_out_op(send_buff, 2);
+		//TODO add delay
 		ctx->nss_pin_op(1);
 	}
 
@@ -435,7 +441,7 @@ ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ENC28_Wai
 
 	{
 		const uint8_t miird_mask = (1 << ENC28_MICMD_MIIRD);
-		status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_MICMD, miird_mask);
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MICMD, miird_mask);
 		EXIT_IF_ERR(status);
 	}
 
@@ -447,8 +453,9 @@ ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ENC28_Wai
 
 		while (status == ENC28_OK)
 		{
-			uint8_t mistat_value = 0;
+			uint8_t mistat_value = 0xff;
 			status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MISTAT, &mistat_value);
+			EXIT_IF_ERR(status);
 			if ((mistat_value & (1 << ENC28_MISTAT_BUSY)) == 0)
 			{
 				break;
@@ -462,14 +469,14 @@ ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ENC28_Wai
 		status = enc28_select_register_bank(ctx, 2);
 		EXIT_IF_ERR(status);
 
-		const uint8_t miird_mask = (1 << ENC28_MICMD_MIIRD);
-		status = enc28_do_clear_bits_ctl_reg(ctx, ENC28_CR_MICMD, miird_mask);
+		const uint8_t miird_mask = 0;
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MICMD, miird_mask);
 		EXIT_IF_ERR(status);
 	}
 
 	{
-		uint8_t reg_val_lo = 0;
-		uint8_t reg_val_hi = 0;
+		uint8_t reg_val_lo = 0xff;
+		uint8_t reg_val_hi = 0xff;
 		status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MIRDL, &reg_val_lo);
 		EXIT_IF_ERR(status);
 		status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MIRDH, &reg_val_hi);

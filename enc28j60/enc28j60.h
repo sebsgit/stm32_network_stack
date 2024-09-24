@@ -48,6 +48,7 @@
 
 #define ENC28_CR_MABBIPG	(0x4)	/* Back-to-Back Inter Packet Gap register */
 #define ENC28_CR_MAIPGL		(0x6)	/* Non-Back-to-Back Inter Packet Gap register, low byte */
+#define ENC28_CR_MAIPGH		(0x7)	/* Non-Back-to-Back Inter Packet Gap register, high byte */
 
 #define ENC28_CR_MAMXFLL	(0x0A)	/* Maximum Frame Length, low byte */
 #define ENC28_CR_MAMXFLH	(0x0B)	/* Maximum Frame Length, high byte */
@@ -59,6 +60,8 @@
 #define ENC28_MICMD_MIIRD	(0)		/* MII address read bit */
 
 #define ENC28_CR_MIREGADR	(0x14)	/* MII register address */
+#define ENC28_CR_MIWRL		(0x16)	/*  */
+#define ENC28_CR_MIWRH		(0x17)	/*  */
 
 #define ENC28_CR_MISTAT		(0x0A)	/* MII status register */
 #define ENC28_MISTAT_BUSY	(0)		/* MII busy bit */
@@ -90,6 +93,7 @@
 #define ENC28_PHYR_PHCON1	(0x0)		/* PHY register PHCON1 */
 #define ENC28_PHYR_PHID1	(0x2)		/* PHY register, partnum1 */
 #define ENC28_PHYR_PHID2	(0x3)		/* PHY register, partnum2 */
+#define ENC28_PHYR_PHLCON	(0x14)		/*  */
 
 /* Customization constants */
 #ifndef ENC28_CONF_RX_ADDRESS_START
@@ -113,11 +117,15 @@
 #endif
 
 #ifndef ENC28_CONF_MABBIPG_BITS
-#define ENC28_CONF_MABBIPG_BITS (0x15)
+#define ENC28_CONF_MABBIPG_BITS (0x12)
 #endif
 
 #ifndef ENC28_CONF_MAIPGL_BITS
 #define ENC28_CONF_MAIPGL_BITS (0x12)
+#endif
+
+#ifndef ENC28_CONF_MAIPGH_BITS
+#define ENC28_CONF_MAIPGH_BITS (0x0C)
 #endif
 
 typedef void (*ENC28_Wait_Micro)(uint32_t);
