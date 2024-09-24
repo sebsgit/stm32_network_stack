@@ -9,6 +9,40 @@
 * */
 #define CHECK_RESERVED_REG(reg_id) if ((reg_id) == 0x1A) { return ENC28_INVALID_REGISTER; }
 
+static uint8_t priv_enc28_curr_bank = 0;
+
+static uint8_t priv_enc28_is_mac_or_mii_reg(uint8_t reg_id)
+{
+	if (priv_enc28_curr_bank == 2)
+	{
+		return (reg_id == ENC28_CR_MACON1) ||
+				(reg_id == ENC28_CR_MACON3) ||
+				(reg_id == ENC28_CR_MACON4) ||
+				(reg_id == ENC28_CR_MABBIPG) ||
+				(reg_id == ENC28_CR_MAIPGL) ||
+				(reg_id == ENC28_CR_MAMXFLH) ||
+				(reg_id == ENC28_CR_MAMXFLL) ||
+				(reg_id == ENC28_CR_MICMD) ||
+				(reg_id == ENC28_CR_MIREGADR) ||
+				(reg_id == ENC28_CR_MIRDH) ||
+				(reg_id == ENC28_CR_MIRDL);
+	}
+	else if (priv_enc28_curr_bank == 3)
+	{
+		return (reg_id == ENC28_CR_MISTAT) ||
+				(reg_id == ENC28_CR_MAC_ADD1) ||
+				(reg_id == ENC28_CR_MAC_ADD2) ||
+				(reg_id == ENC28_CR_MAC_ADD3) ||
+				(reg_id == ENC28_CR_MAC_ADD4) ||
+				(reg_id == ENC28_CR_MAC_ADD5) ||
+				(reg_id == ENC28_CR_MAC_ADD6);
+	}
+	else
+	{
+		return 0;
+	}
+}
+
 static ENC28_CommandStatus priv_enc28_do_buffer_register_init(ENC28_SPI_Context *ctx)
 {
 	uint8_t addr_lo = ENC28_CONF_RX_ADDRESS_START & 0xFF;
@@ -199,9 +233,20 @@ ENC28_CommandStatus enc28_do_read_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_id
 			return status;
 		}
 
+		const uint8_t skip_dummy_byte = priv_enc28_is_mac_or_mii_reg(reg_id);
+
 		ctx->nss_pin_op(0);
 		ctx->spi_out_op(&cmd_buff, 1);
-		ctx->spi_in_op(reg_value, 1);
+		if (skip_dummy_byte)
+		{
+			uint8_t buff[2];
+			ctx->spi_in_op(buff, 2);
+			*reg_value = buff[1];
+		}
+		else
+		{
+			ctx->spi_in_op(reg_value, 1);
+		}
 		ctx->nss_pin_op(1);
 	}
 
@@ -244,7 +289,8 @@ ENC28_CommandStatus enc28_do_write_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_i
 		}
 
 		ctx->nss_pin_op(0);
-		ctx->spi_out_op((const uint8_t*)&cmd_buff, 2);
+		uint8_t send_buff[2] = {(cmd_buff >> 8), cmd_buff & 0xFF};
+		ctx->spi_out_op(send_buff, 2);
 		ctx->nss_pin_op(1);
 	}
 
@@ -302,7 +348,8 @@ ENC28_CommandStatus enc28_do_set_bits_ctl_reg(ENC28_SPI_Context *ctx, uint8_t re
 		}
 
 		ctx->nss_pin_op(0);
-		ctx->spi_out_op((const uint8_t*)&cmd_buff, 2);
+		uint8_t send_buff[2] = {(cmd_buff >> 8), cmd_buff & 0xFF};
+		ctx->spi_out_op(send_buff, 2);
 		ctx->nss_pin_op(1);
 	}
 
@@ -330,7 +377,8 @@ ENC28_CommandStatus enc28_do_clear_bits_ctl_reg(ENC28_SPI_Context *ctx, uint8_t 
 		}
 
 		ctx->nss_pin_op(0);
-		ctx->spi_out_op((const uint8_t*)&cmd_buff, 2);
+		uint8_t send_buff[2] = {(cmd_buff >> 8), cmd_buff & 0xFF};
+		ctx->spi_out_op(send_buff, 2);
 		ctx->nss_pin_op(1);
 	}
 
@@ -351,6 +399,11 @@ ENC28_CommandStatus enc28_select_register_bank(ENC28_SPI_Context *ctx, const uin
 	econ1_reg &= ~(ENC28_ECON1_BSEL);
 	econ1_reg |= ENC28_ECON1_BANK_SEL(bank_id);
 	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ECON1, econ1_reg);
+
+	if (status == ENC28_OK)
+	{
+		priv_enc28_curr_bank = bank_id;
+	}
 
 	return status;
 }

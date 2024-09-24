@@ -87,6 +87,10 @@
 #define ENC28_ERXFCON_MULTI	(1 << 1)	/* Multicast packet filter bit */
 #define ENC28_ERXFCON_BCAST	(1 << 0)	/* Broadcast packet filter bit */
 
+#define ENC28_PHYR_PHCON1	(0x0)		/* PHY register PHCON1 */
+#define ENC28_PHYR_PHID1	(0x2)		/* PHY register, partnum1 */
+#define ENC28_PHYR_PHID2	(0x3)		/* PHY register, partnum2 */
+
 /* Customization constants */
 #ifndef ENC28_CONF_RX_ADDRESS_START
 #define ENC28_CONF_RX_ADDRESS_START	(0x00)	/* Default start address of the packet receive buffer */
