@@ -106,6 +106,7 @@ static ENC28_CommandStatus priv_enc28_do_mac_init(const ENC28_MAC_Address mac_ad
 	}
 
 	{
+		//TODO read "full-duplex" bit from PHYCON1 register and set macon3.fuldpx to the same value
 		const uint8_t macon3_mask = ENC28_CONF_MACON3_FRAME_PAD_MASK |
 					(1 << ENC28_MACON3_TXCRCEN);
 		status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_MACON3, macon3_mask);
@@ -133,9 +134,11 @@ static ENC28_CommandStatus priv_enc28_do_mac_init(const ENC28_MAC_Address mac_ad
 	}
 
 	{
+		//TODO: use 15h if full duplex, 12h if half-duplex
 		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAIPGL, ENC28_CONF_MAIPGL_BITS);
 		EXIT_IF_ERR(status);
 
+		//TODO: only for half-duplex mode
 		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAIPGH, ENC28_CONF_MAIPGH_BITS);
 		EXIT_IF_ERR(status);
 	}
