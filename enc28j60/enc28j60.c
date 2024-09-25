@@ -12,6 +12,11 @@
 //TODO refactor : keep bank ID together with register name
 static uint8_t priv_enc28_curr_bank = 0;
 
+static uint8_t priv_enc28_is_phy_reg(uint8_t reg_id)
+{
+	return (reg_id <= 0x03) || (reg_id >= 0x10 && reg_id <= 0x14);
+}
+
 static uint8_t priv_enc28_is_mac_or_mii_reg(uint8_t reg_id)
 {
 	if (priv_enc28_curr_bank == 2)
@@ -93,6 +98,7 @@ static ENC28_CommandStatus priv_enc28_do_poll_estat_clk(ENC28_SPI_Context *ctx)
 
 static ENC28_CommandStatus priv_enc28_do_mac_init(const ENC28_MAC_Address mac_add, ENC28_SPI_Context *ctx)
 {
+	uint8_t is_full_duplex = 0;
 	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 2); //TODO do not hardcode 2
 	EXIT_IF_ERR(status);
 
@@ -106,9 +112,19 @@ static ENC28_CommandStatus priv_enc28_do_mac_init(const ENC28_MAC_Address mac_ad
 	}
 
 	{
-		//TODO read "full-duplex" bit from PHYCON1 register and set macon3.fuldpx to the same value
-		const uint8_t macon3_mask = ENC28_CONF_MACON3_FRAME_PAD_MASK |
+		uint16_t phcon1_value = 0;
+		status = enc28_do_read_phy_register(ctx, ENC28_PHYR_PHCON1, &phcon1_value);
+		EXIT_IF_ERR(status);
+		is_full_duplex = (phcon1_value & (1 << ENC28_PHCON1_PDPXMD)) != 0;
+	}
+
+	{
+		uint8_t macon3_mask = ENC28_CONF_MACON3_FRAME_PAD_MASK |
 					(1 << ENC28_MACON3_TXCRCEN);
+		if (is_full_duplex)
+		{
+			macon3_mask |= (1 << ENC28_MACON3_FULLDPX);
+		}
 		status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_MACON3, macon3_mask);
 		EXIT_IF_ERR(status);
 	}
@@ -134,13 +150,16 @@ static ENC28_CommandStatus priv_enc28_do_mac_init(const ENC28_MAC_Address mac_ad
 	}
 
 	{
-		//TODO: use 15h if full duplex, 12h if half-duplex
-		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAIPGL, ENC28_CONF_MAIPGL_BITS);
+		status = enc28_do_write_ctl_reg(ctx,
+				ENC28_CR_MAIPGL,
+				is_full_duplex ? ENC28_CONF_MAIPGL_BITS_FULLDUP : ENC28_CONF_MAIPGL_BITS_HALFDUP);
 		EXIT_IF_ERR(status);
 
-		//TODO: only for half-duplex mode
-		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAIPGH, ENC28_CONF_MAIPGH_BITS);
-		EXIT_IF_ERR(status);
+		if (!is_full_duplex)
+		{
+			status = enc28_do_write_ctl_reg(ctx, ENC28_CR_MAIPGH, ENC28_CONF_MAIPGH_BITS);
+			EXIT_IF_ERR(status);
+		}
 	}
 
 	{
@@ -282,7 +301,7 @@ ENC28_CommandStatus enc28_do_write_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_i
 		return ENC28_INVALID_PARAM;
 	}
 
-	if ((!ctx->nss_pin_op) || (!ctx->spi_in_op) || (!ctx->spi_out_op))
+	if ((!ctx->nss_pin_op) || (!ctx->spi_in_op) || (!ctx->spi_out_op) || (!ctx->wait_nano))
 	{
 		return ENC28_INVALID_PARAM;
 	}
@@ -296,10 +315,10 @@ ENC28_CommandStatus enc28_do_write_ctl_reg(ENC28_SPI_Context *ctx, uint8_t reg_i
 		}
 
 		ctx->nss_pin_op(0);
-		//TODO add delay
+		ctx->wait_nano(50); // CS setup time
 		uint8_t send_buff[2] = {(cmd_buff >> 8), cmd_buff & 0xFF};
 		ctx->spi_out_op(send_buff, 2);
-		//TODO add delay
+		ctx->wait_nano(210); // CS hold time (TODO: MAC and MII registers = 210, ETH registers = 10)
 		ctx->nss_pin_op(1);
 	}
 
@@ -417,21 +436,19 @@ ENC28_CommandStatus enc28_select_register_bank(ENC28_SPI_Context *ctx, const uin
 	return status;
 }
 
-ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ENC28_Wait_Micro wait_func, uint8_t reg_id, uint16_t *reg_value)
+ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, uint8_t reg_id, uint16_t *reg_value)
 {
-	CHECK_RESERVED_REG(reg_id);
+	if (!priv_enc28_is_phy_reg(reg_id))
+	{
+		return ENC28_INVALID_PARAM;
+	}
 
 	if (!ctx)
 	{
 		return ENC28_INVALID_PARAM;
 	}
 
-	if ((!ctx->nss_pin_op) || (!ctx->spi_in_op) || (!ctx->spi_out_op))
-	{
-		return ENC28_INVALID_PARAM;
-	}
-
-	if (!wait_func)
+	if ((!ctx->nss_pin_op) || (!ctx->spi_in_op) || (!ctx->spi_out_op) || (!ctx->wait_nano))
 	{
 		return ENC28_INVALID_PARAM;
 	}
@@ -448,7 +465,7 @@ ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ENC28_Wai
 		EXIT_IF_ERR(status);
 	}
 
-	wait_func(11);
+	ctx->wait_nano(11 * 1000);
 
 	{
 		status = enc28_select_register_bank(ctx, 3);
@@ -463,7 +480,7 @@ ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ENC28_Wai
 			{
 				break;
 			}
-			wait_func(1);
+			ctx->wait_nano(1);
 		}
 		EXIT_IF_ERR(status);
 	}

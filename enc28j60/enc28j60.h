@@ -91,6 +91,8 @@
 #define ENC28_ERXFCON_BCAST	(1 << 0)	/* Broadcast packet filter bit */
 
 #define ENC28_PHYR_PHCON1	(0x0)		/* PHY register PHCON1 */
+#define ENC28_PHCON1_PDPXMD	(8)			/* PHCON1 Duplex Mode bit */
+
 #define ENC28_PHYR_PHID1	(0x2)		/* PHY register, partnum1 */
 #define ENC28_PHYR_PHID2	(0x3)		/* PHY register, partnum2 */
 #define ENC28_PHYR_PHLCON	(0x14)		/*  */
@@ -120,15 +122,17 @@
 #define ENC28_CONF_MABBIPG_BITS (0x12)
 #endif
 
-#ifndef ENC28_CONF_MAIPGL_BITS
-#define ENC28_CONF_MAIPGL_BITS (0x12)
+#ifndef ENC28_CONF_MAIPGL_BITS_FULLDUP
+#define ENC28_CONF_MAIPGL_BITS_FULLDUP (0x15)
+#endif
+
+#ifndef ENC28_CONF_MAIPGL_BITS_HALFDUP
+#define ENC28_CONF_MAIPGL_BITS_HALFDUP (0x12)
 #endif
 
 #ifndef ENC28_CONF_MAIPGH_BITS
 #define ENC28_CONF_MAIPGH_BITS (0x0C)
 #endif
-
-typedef void (*ENC28_Wait_Micro)(uint32_t);
 
 typedef enum
 {
@@ -142,6 +146,7 @@ typedef struct
 	void (*nss_pin_op)(uint8_t);
 	void (*spi_out_op)(const uint8_t *buff, size_t len);
 	void (*spi_in_op)(uint8_t *buff, size_t len);
+	void (*wait_nano)(uint32_t);
 } ENC28_SPI_Context;
 
 typedef struct
@@ -235,6 +240,13 @@ extern ENC28_CommandStatus enc28_do_clear_bits_ctl_reg(ENC28_SPI_Context *ctx, u
  * */
 extern ENC28_CommandStatus enc28_select_register_bank(ENC28_SPI_Context *ctx, const uint8_t bank_id);
 
-extern ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ENC28_Wait_Micro wait_func, uint8_t reg_id, uint16_t *reg_value);
+/**
+ * @brief Reads the content of the specified PHY register
+ * @param ctx The communication context
+ * @param reg_id The PHY register ID
+ * @param reg_value The output value
+ * @return The status of the operation
+ * */
+extern ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, uint8_t reg_id, uint16_t *reg_value);
 
 #endif /* INC_ENC28J60_H_ */
