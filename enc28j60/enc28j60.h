@@ -24,6 +24,8 @@
 #define ENC28_OP_BFC	(0x5)	/* Bit field clear */
 #define ENC28_OP_SRC	(0x7)	/* Soft reset */
 
+#define ENC28_CR_EPKTCNT	(0x19)
+
 #define ENC28_CR_EIE		(0x1B)	/* Ethernet Interrupt Enable register */
 #define ENC28_EIE_RXERIE	(0)		/* Receive Error Interrupt Enable bit */
 #define ENC28_EIE_TXERIE 	(1)		/* Transmit Error Interrupt Enable bit */
@@ -101,17 +103,19 @@
 #define ENC28_CR_MAC_ADD5	(0x00)		/* MAC address byte 4 */
 #define ENC28_CR_MAC_ADD6	(0x01)		/* MAC address byte 5 */
 
+#define ENC28_CR_ERDPTL		(0x00)		/* Receive read pointer address, low byte */
+#define ENC28_CR_ERDPTH		(0x01)		/* Receive read pointer address, high byte */
 #define ENC28_CR_ERXSTL		(0x08)		/* Receive buffer address start, low byte */
 #define ENC28_CR_ERXSTH		(0x09)		/* Receive buffer address start, high byte */
 #define ENC28_CR_ERXNDL		(0x0A)		/* Receive buffer address end, low byte */
 #define ENC28_CR_ERXNDH		(0x0B)		/* Receive buffer address end, high byte */
-#define ENC28_CR_ERDPTL		(0x0C)		/* Receive read pointer address, low byte */
-#define ENC28_CR_ERDPTH		(0x0D)		/* Receive read pointer address, high byte */
+#define ENC28_CR_ERXRDPTL	(0x0C)
+#define ENC28_CR_ERXRDPTH	(0x0D)
 
 #define ENC28_CR_EREVID		(0x12)		/* Ethernet Revision ID */
 
 #define ENC28_CR_ESTAT		(0x1D)		/* Status register */
-#define ENC28_ESTAT_CLKRDY	(1)			/* ESTAT clock ready bit */
+#define ENC28_ESTAT_CLKRDY	(0)			/* ESTAT clock ready bit */
 
 #define ENC28_CR_ERXFCON	(0x18)		/* Packet filter register */
 #define ENC28_ERXFCON_UNI	(1 << 7)	/* Unicast packet filter bit */
@@ -129,11 +133,11 @@
 
 /* Customization constants */
 #ifndef ENC28_CONF_RX_ADDRESS_START
-#define ENC28_CONF_RX_ADDRESS_START	(0x00)	/* Default start address of the packet receive buffer */
+#define ENC28_CONF_RX_ADDRESS_START	(0x7D0)	/* Default start address of the packet receive buffer */
 #endif
 
 #ifndef ENC28_CONF_RX_ADDRESS_END
-#define ENC28_CONF_RX_ADDRESS_END	(0x11ff)	/* Default end address of the packet receive buffer */
+#define ENC28_CONF_RX_ADDRESS_END	(0x1eff)	/* Default end address of the packet receive buffer */
 #endif
 
 #ifndef ENC28_CONF_PACKET_FILTER_MASK
@@ -198,6 +202,8 @@ typedef struct
  * @return Status of the operation
  * */
 extern ENC28_CommandStatus enc28_do_init(const ENC28_MAC_Address mac_add, ENC28_SPI_Context *ctx);
+
+extern ENC28_CommandStatus enc28_do_soft_reset(ENC28_SPI_Context *ctx);
 
 extern ENC28_CommandStatus enc28_do_read_hw_rev(ENC28_SPI_Context *ctx, ENC28_HW_Rev *hw_rev);
 

@@ -90,7 +90,7 @@ static ENC28_CommandStatus priv_enc28_do_poll_estat_clk(ENC28_SPI_Context *ctx)
 
 	while (status == ENC28_OK)
 	{
-		if (reg_value & ENC28_ESTAT_CLKRDY)
+		if (reg_value & (1 << ENC28_ESTAT_CLKRDY))
 		{
 			break;
 		}
@@ -222,6 +222,27 @@ ENC28_CommandStatus enc28_do_init(const ENC28_MAC_Address mac_add, ENC28_SPI_Con
 	status = priv_enc28_do_phy_init(ctx);
 
 	return status;
+}
+
+ENC28_CommandStatus enc28_do_soft_reset(ENC28_SPI_Context *ctx)
+{
+	if (!ctx)
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	if ((!ctx->nss_pin_op) || (!ctx->spi_in_op) || (!ctx->spi_out_op))
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	uint8_t cmd_buff = 0xFF;
+
+	ctx->nss_pin_op(0);
+	ctx->spi_out_op(&cmd_buff, 1);
+	ctx->nss_pin_op(1);
+
+	return ENC28_OK;
 }
 
 ENC28_CommandStatus enc28_do_read_hw_rev(ENC28_SPI_Context *ctx, ENC28_HW_Rev *hw_rev)
