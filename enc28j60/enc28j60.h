@@ -49,9 +49,14 @@
 #define ENC28_CR_MABBIPG	(0x4)	/* Back-to-Back Inter Packet Gap register */
 #define ENC28_CR_MAIPGL		(0x6)	/* Non-Back-to-Back Inter Packet Gap register, low byte */
 #define ENC28_CR_MAIPGH		(0x7)	/* Non-Back-to-Back Inter Packet Gap register, high byte */
+#define ENC28_CR_MACLCON1	(0x8)
+#define ENC28_CR_MACLCON2	(0x9)
 
 #define ENC28_CR_MAMXFLL	(0x0A)	/* Maximum Frame Length, low byte */
 #define ENC28_CR_MAMXFLH	(0x0B)	/* Maximum Frame Length, high byte */
+
+#define ENC28_CR_MIWRL		(0x16)
+#define ENC28_CR_MIWRH		(0x17)
 
 #define ENC28_CR_MIRDL		(0x18)	/* MII register value, low byte */
 #define ENC28_CR_MIRDH		(0x19)	/* MII register value, high byte */

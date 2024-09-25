@@ -27,12 +27,16 @@ static uint8_t priv_enc28_is_mac_or_mii_reg(uint8_t reg_id)
 				(reg_id == ENC28_CR_MABBIPG) ||
 				(reg_id == ENC28_CR_MAIPGL) ||
 				(reg_id == ENC28_CR_MAIPGH) ||
+				(reg_id == ENC28_CR_MACLCON1) ||
+				(reg_id == ENC28_CR_MACLCON2) ||
 				(reg_id == ENC28_CR_MAMXFLH) ||
 				(reg_id == ENC28_CR_MAMXFLL) ||
 				(reg_id == ENC28_CR_MICMD) ||
 				(reg_id == ENC28_CR_MIREGADR) ||
-				(reg_id == ENC28_CR_MIRDH) ||
-				(reg_id == ENC28_CR_MIRDL);
+				(reg_id == ENC28_CR_MIWRL) ||
+				(reg_id == ENC28_CR_MIWRH) ||
+				(reg_id == ENC28_CR_MIRDL) ||
+				(reg_id == ENC28_CR_MIRDH);
 	}
 	else if (priv_enc28_curr_bank == 3)
 	{
