@@ -24,15 +24,38 @@
 #define ENC28_OP_BFC	(0x5)	/* Bit field clear */
 #define ENC28_OP_SRC	(0x7)	/* Soft reset */
 
+#define ENC28_CR_EIE		(0x1B)	/* Ethernet Interrupt Enable register */
+#define ENC28_EIE_RXERIE	(0)		/* Receive Error Interrupt Enable bit */
+#define ENC28_EIE_TXERIE 	(1)		/* Transmit Error Interrupt Enable bit */
+#define ENC28_EIE_TXIE		(3)		/* Transmit Enable bit */
+#define ENC28_EIE_LINKIE	(4)		/* Link Status Change Interrupt Enable bit */
+#define ENC28_EIE_DMAIE		(5)		/* DMA Interrupt Enable bit */
+#define ENC28_EIE_PKTIE		(6)		/* Reeive Packet Pending Interrupt Enable bit */
+#define ENC28_EIE_INTIE		(7)		/* Global Interrupt Enable bit */
+
+#define ENC28_CR_EIR		(0x1C)	/* Ethernet Interrupt Request register */
+#define ENC28_EIR_RXERIF	(0)		/* Receive Error bit */
+#define ENC28_EIR_TXERIF	(1)		/* Transmit Error bit */
+#define ENC28_EIR_TXIF		(3)		/* Transmit Interrupt Flag (transmission completed) */
+#define ENC28_EIR_LINKIF	(4)		/* Link Change flag */
+#define ENC28_EIR_DMAIF		(5)		/* DMA transaction completed */
+#define ENC28_EIR_PKTIF		(6)		/* Receive Packet Pending flag */
+
+#define ENC28_CR_ECON2		(0x1E)	/* Ethernet control register 2 */
+#define ENC28_ECON2_VRPS	(3)		/* Voltage Regulator Power Save bit */
+#define ENC28_ECON2_PWRSV	(5)		/* Power Save Enable bit */
+#define ENC28_ECON2_PKTDEC	(6)		/* Packet Decrement bit */
+#define ENC28_ECON2_AUTOINC	(7)		/* Automatic Buffer Pointer Increment enable bit */
+
 #define ENC28_CR_ECON1		(0x1F)		/* Ethernet control register 1 */
 #define ENC28_ECON1_BANK_SEL(n)		(n)		/* Bank select value */
 #define ENC28_ECON1_BSEL			(0x3)	/* Bank select register bit mask */
-#define ENC28_ECON1_RXEN			(1 << 2)	/* Receive enable bit */
-#define ENC28_ECON1_TXRTS			(1 << 3)	/* Transmit request to send */
-#define ENC28_ECON1_CSUM_EN			(1 << 4)	/* DMA checksum enable */
-#define ENC28_ECON1_DMA_BUSY		(1 << 5)	/* DMA busy bit */
-#define ENC28_ECON1_RX_RST			(1 << 6)	/* Receive logic reset bit */
-#define ENC28_ECON1_TX_RST			(1 << 7)	/* Transmit logic reset bit */
+#define ENC28_ECON1_RXEN			(2)		/* Receive enable bit */
+#define ENC28_ECON1_TXRTS			(3)		/* Transmit request to send */
+#define ENC28_ECON1_CSUM_EN			(4)		/* DMA checksum enable */
+#define ENC28_ECON1_DMA_BUSY		(5)		/* DMA busy bit */
+#define ENC28_ECON1_RX_RST			(6)		/* Receive logic reset bit */
+#define ENC28_ECON1_TX_RST			(7)		/* Transmit logic reset bit */
 
 #define ENC28_CR_MACON1		(0x0)	/* MAC control register 1 */
 #define ENC28_MACON1_RXEN	(0)		/* MAC receive enable bit */
