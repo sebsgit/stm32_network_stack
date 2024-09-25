@@ -224,6 +224,33 @@ ENC28_CommandStatus enc28_do_init(const ENC28_MAC_Address mac_add, ENC28_SPI_Con
 	return status;
 }
 
+ENC28_CommandStatus enc28_do_read_hw_rev(ENC28_SPI_Context *ctx, ENC28_HW_Rev *hw_rev)
+{
+	if (!hw_rev)
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	ENC28_CommandStatus status = enc28_do_read_phy_register(
+			ctx,
+			ENC28_PHYR_PHID1,
+			&hw_rev->phid1);
+	EXIT_IF_ERR(status);
+
+	status = enc28_do_read_phy_register(
+			ctx,
+			ENC28_PHYR_PHID2,
+			&hw_rev->phid2);
+	EXIT_IF_ERR(status);
+
+	status = enc28_select_register_bank(ctx, 3);
+	EXIT_IF_ERR(status);
+
+	status = enc28_do_read_ctl_reg(ctx, ENC28_CR_EREVID, &hw_rev->ethrev);
+
+	return status;
+}
+
 ENC28_CommandStatus enc28_prepare_read_ctl_reg(uint8_t *out, uint8_t reg_id)
 {
 	CHECK_RESERVED_REG(reg_id);

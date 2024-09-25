@@ -85,6 +85,8 @@
 #define ENC28_CR_ERDPTL		(0x0C)		/* Receive read pointer address, low byte */
 #define ENC28_CR_ERDPTH		(0x0D)		/* Receive read pointer address, high byte */
 
+#define ENC28_CR_EREVID		(0x12)		/* Ethernet Revision ID */
+
 #define ENC28_CR_ESTAT		(0x1D)		/* Status register */
 #define ENC28_ESTAT_CLKRDY	(1)			/* ESTAT clock ready bit */
 
@@ -159,6 +161,13 @@ typedef struct
 	uint8_t addr[6];
 } ENC28_MAC_Address;
 
+typedef struct
+{
+	uint16_t phid1;
+	uint16_t phid2;
+	uint8_t ethrev;
+} ENC28_HW_Rev;
+
 /**
  * @brief Performs the initialisation sequence.
  * @param mac_add The MAC address to initialize the interface with
@@ -166,6 +175,8 @@ typedef struct
  * @return Status of the operation
  * */
 extern ENC28_CommandStatus enc28_do_init(const ENC28_MAC_Address mac_add, ENC28_SPI_Context *ctx);
+
+extern ENC28_CommandStatus enc28_do_read_hw_rev(ENC28_SPI_Context *ctx, ENC28_HW_Rev *hw_rev);
 
 /**
  *  @brief Prepares the "register read" command for the specified control register.
