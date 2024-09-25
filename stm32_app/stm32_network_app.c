@@ -1,6 +1,7 @@
 #include "enc28j60.h"
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "stm32f4xx_hal.h"
 
@@ -126,6 +127,15 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 				  printf("HDR= %x %x | %x %x %x %x\n", hdr[1], hdr[2], hdr[3], hdr[4], hdr[5], hdr[6]);
 				  uint16_t PP = (((hdr[2] & 0x1F) << 8) | hdr[1]);
 
+
+				  ENC28_Receive_Status_Vector status_vec;
+				  memcpy(&status_vec, hdr + 3, 4);
+
+				  if (!status_vec.status_bits_lo.received_ok)
+				  {
+					  for(;;);
+				  }
+
 				  {
 					  // update  ERDPT to skip the current packet next time
 					  enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTL, hdr[1]);
@@ -142,7 +152,7 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 				  }
 				  printf("NEXT PP=%d\n", PP);
 
-				  const uint16_t packet_len = (hdr[4] << 8) | hdr[3];
+				  const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
 				  printf("PACKET LEN= %d\n", packet_len);
 
 				  //TODO fix handling the ERXRDPT

@@ -8,6 +8,7 @@
 #ifndef INC_ENC28J60_H_
 #define INC_ENC28J60_H_
 
+#include <assert.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -194,6 +195,44 @@ typedef struct
 	uint16_t phid2;
 	uint8_t ethrev;
 } ENC28_HW_Rev;
+
+typedef struct
+{
+	uint8_t long_drop_event: 1;
+	uint8_t reserved2: 1;
+	uint8_t carr_event_seen: 1;
+	uint8_t reserved1: 1;
+	uint8_t crc_err: 1;
+	uint8_t len_check_err: 1;
+	uint8_t len_out_of_range: 1;
+	uint8_t received_ok: 1;
+} ENC28_Receive_Status_Vec_Bits_16_23;
+
+_Static_assert(sizeof(ENC28_Receive_Status_Vec_Bits_16_23) == 1);
+
+typedef struct
+{
+	uint8_t multicast: 1;
+	uint8_t broadcast: 1;
+	uint8_t dribble_nibble: 1;
+	uint8_t ctrl_frame: 1;
+	uint8_t pause_ctrl_frame: 1;
+	uint8_t unknown_opcode: 1;
+	uint8_t vlan_type: 1;
+	uint8_t zero: 1;
+} ENC28_Receive_Status_Vec_Bits_24_31;
+
+_Static_assert(sizeof(ENC28_Receive_Status_Vec_Bits_24_31) == 1);
+
+typedef struct
+{
+	uint8_t packet_len_lo;
+	uint8_t packet_len_hi;
+	ENC28_Receive_Status_Vec_Bits_16_23 status_bits_lo;
+	ENC28_Receive_Status_Vec_Bits_24_31 status_bits_hi;
+} ENC28_Receive_Status_Vector;
+
+_Static_assert(sizeof(ENC28_Receive_Status_Vector) == 4);
 
 /**
  * @brief Performs the initialisation sequence.
