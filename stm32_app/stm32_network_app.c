@@ -66,31 +66,6 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 	  printf("REV ID: %d\n", (int)hw_rev.ethrev);
   }
 
-  int i;
-  for (i = 0; i < 4; ++i)
-  {
-	  printf("Register Bank = %d\n", i);
-	  status = enc28_select_register_bank(ctx, i);
-	  ASSERT_STATUS(status);
-
-	  uint8_t econ1 = 0;
-	  status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ECON1, &econ1);
-	  ASSERT_STATUS(status);
-
-	  printf("ECON1= %x (%d)\n", econ1, (int)econ1);
-	  enc28_debug_do_reg_dump(ctx);
-  }
-
-  for (i = 0 ; i <= 0x14; ++i)
-  {
-	  uint16_t phy_con_1 = 0;
-	  status = enc28_do_read_phy_register(ctx, i, &phy_con_1);
-	  if (status == ENC28_OK)
-	  {
-		  printf("PHYR [%x]: %x\n", i, phy_con_1);
-	  }
-  }
-
   { // Setup packet receiving
 	  status = enc28_select_register_bank(ctx, 0);
 	  ASSERT_STATUS(status);
@@ -167,15 +142,14 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 				  }
 				  printf("NEXT PP=%d\n", PP);
 
-				  uint16_t len1 = (hdr[3] << 8) | hdr[4];
-				  uint16_t len2 = (hdr[4] << 8) | hdr[3];
-				  printf("LEN= %d %d\n", len1, len2);
+				  const uint16_t packet_len = (hdr[4] << 8) | hdr[3];
+				  printf("PACKET LEN= %d\n", packet_len);
 
 				  //TODO fix handling the ERXRDPT
-			//	  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTL, PP & 0xFF);
-			//	  ASSERT_STATUS(status);
-			//	  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTH, (PP >> 8) & 0x1F);
-			//	  ASSERT_STATUS(status);
+				//  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTL, PP & 0xFF);
+				//  ASSERT_STATUS(status);
+				//  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTH, (PP >> 8) & 0x1F);
+				//  ASSERT_STATUS(status);
 			  }
 
 

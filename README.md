@@ -9,7 +9,7 @@ Integration of ENC28J60 Ethernet module into STM32 board
 |CN7|20|GND|Ground connection|
 |CN7|35|PC2|SPI2 MISO|
 |CN7|37|PC3|SPI2 MOSI|
-|CN19|1|PC9|GPIO Input: interrupt pin|
+|CN19|1|PC9|GPIO Input: interrupt pin (falling edge)|
 |CN19|16|PB12|SPI2 NSS|
 |CN19|25|PB10|SPI2 Clock|
 
