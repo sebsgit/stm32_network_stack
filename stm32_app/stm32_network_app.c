@@ -3,13 +3,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "stm32f4xx_hal.h"
+#include <FreeRTOS.h>
+#include <task.h>
 
 #define ASSERT_STATUS(s) if ((s) != ENC28_OK) { for(;;); }
+#define PACKET_HANDLER_STACK_DEPTH_WORDS 600
+#define DEFAULT_TASK_PRIO 1
 
 static volatile uint8_t exti_int_flag = 0;
-
-extern SPI_HandleTypeDef hspi2;
+static TaskHandle_t packet_task_handle;
 
 void enc28_debug_do_reg_dump(ENC28_SPI_Context *ctx)
 {
@@ -33,7 +35,36 @@ void enc28_debug_do_reg_dump(ENC28_SPI_Context *ctx)
 
 void enc28_test_app_handle_packet_recv_interrupt(void)
 {
-	exti_int_flag = 1;
+	vTaskNotifyGiveFromISR(packet_task_handle, NULL);
+}
+
+void packet_handling_task(void * arg)
+{
+	ENC28_SPI_Context *ctx = (ENC28_SPI_Context*)arg;
+	uint8_t pkt_buf[1600];
+	UBaseType_t stack_high_watermark = 0;
+	ENC28_Receive_Status_Vector status_vec;
+	ENC28_CommandStatus rcv_stat;
+
+	while (1)
+	{
+		memset(pkt_buf, 0xFF, sizeof(pkt_buf));
+		rcv_stat = enc28_read_packet(ctx, pkt_buf, sizeof(pkt_buf), &status_vec);
+
+		while (rcv_stat == ENC28_OK)
+		{
+			const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
+			printf("GOT PACKET, LEN= %d\n", packet_len);
+
+			memset(pkt_buf, 0xFF, sizeof(pkt_buf));
+			rcv_stat = enc28_read_packet(ctx, pkt_buf, sizeof(pkt_buf), &status_vec);
+
+			stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
+			configASSERT(stack_high_watermark > 0); // stack exhausted !
+		}
+
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+	}
 }
 
 void enc28_test_app(ENC28_SPI_Context *ctx)
@@ -70,26 +101,15 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
   status = enc28_begin_packet_transfer(ctx);
   ASSERT_STATUS(status);
 
-  uint8_t pkt_buf[1600];
+  BaseType_t task_status = xTaskCreate(
+		  packet_handling_task,
+		  "packet_handler",
+		  PACKET_HANDLER_STACK_DEPTH_WORDS,
+		  ctx,
+		  DEFAULT_TASK_PRIO,
+		  &packet_task_handle);
+  configASSERT(task_status == pdPASS);
 
-	while (1)
-	{
-	  if (exti_int_flag)
-	  {
-		  exti_int_flag = 0;
-
-		  memset(pkt_buf, 0xFF, sizeof(pkt_buf));
-		  ENC28_Receive_Status_Vector status_vec;
-		  ENC28_CommandStatus rcv_stat = enc28_read_packet(ctx, pkt_buf, 1600, &status_vec);
-		  while (rcv_stat == ENC28_OK)
-		  {
-			  const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
-			  printf("GOT PACKET, LEN= %d\n", packet_len);
-
-			  memset(pkt_buf, 0xFF, sizeof(pkt_buf));
-			  rcv_stat = enc28_read_packet(ctx, pkt_buf, 1600, &status_vec);
-		  }
-	  }
-	}
+  vTaskStartScheduler();
 }
 
