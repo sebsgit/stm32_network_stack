@@ -173,7 +173,11 @@ typedef enum
 {
 	ENC28_OK,
 	ENC28_INVALID_REGISTER,
-	ENC28_INVALID_PARAM
+	ENC28_INVALID_PARAM,
+	ENC28_NO_DATA,
+	ENC28_READ_PTR_OUT_OF_RANGE,
+	ENC28_BUFFER_TOO_SMALL,
+	ENC28_PACKET_RCV_ERR
 } ENC28_CommandStatus;
 
 typedef struct
@@ -181,6 +185,7 @@ typedef struct
 	void (*nss_pin_op)(uint8_t);
 	void (*spi_out_op)(const uint8_t *buff, size_t len);
 	void (*spi_in_op)(uint8_t *buff, size_t len);
+	void (*spi_in_out_op)(const uint8_t *tx, uint8_t *rx, size_t len);
 	void (*wait_nano)(uint32_t);
 } ENC28_SPI_Context;
 
@@ -350,6 +355,8 @@ extern ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ui
  * @return Status of the operation
  * */
 extern ENC28_CommandStatus enc28_begin_packet_transfer(ENC28_SPI_Context *ctx);
+
+extern ENC28_CommandStatus enc28_read_packet(ENC28_SPI_Context *ctx, uint8_t *packet_buf, uint16_t buf_size, ENC28_Receive_Status_Vector *opt_status_vec);
 
 /**
  * @brief Stops the ETH packet transfer

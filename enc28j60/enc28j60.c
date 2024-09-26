@@ -84,6 +84,8 @@ static ENC28_CommandStatus priv_enc28_do_buffer_register_init(ENC28_SPI_Context 
 static ENC28_CommandStatus priv_enc28_do_receive_filter_init(ENC28_SPI_Context *ctx)
 {
 	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 1);
+	EXIT_IF_ERR(status);
+
 	return enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXFCON, ENC28_CONF_PACKET_FILTER_MASK);
 }
 
@@ -591,6 +593,104 @@ ENC28_CommandStatus enc28_begin_packet_transfer(ENC28_SPI_Context *ctx)
 	mask |= (1 << ENC28_ECON1_RXEN);
 	status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_ECON1, mask);
 	return status;
+}
+
+ENC28_CommandStatus enc28_read_packet(ENC28_SPI_Context *ctx, uint8_t *packet_buf, uint16_t buf_size, ENC28_Receive_Status_Vector *opt_status_vec)
+{
+	uint8_t val = 0;
+	ENC28_CommandStatus status = enc28_do_read_ctl_reg(ctx, ENC28_CR_EIR, &val);
+	EXIT_IF_ERR(status);
+
+	if (val & (1 << ENC28_EIR_PKTIF))
+	{
+		uint16_t read_ptr = 0;
+
+		status = enc28_select_register_bank(ctx, 0);
+		EXIT_IF_ERR(status);
+		status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ERDPTL, &val);
+		read_ptr = val;
+		status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ERDPTH, &val);
+		read_ptr |= ((val & 0x1F) << 8);
+
+		if ((read_ptr < ENC28_CONF_RX_ADDRESS_START) || (read_ptr > ENC28_CONF_RX_ADDRESS_END))
+		{
+			return ENC28_READ_PTR_OUT_OF_RANGE;
+		}
+
+		uint8_t command[7] = {0x3A, 0, 0, 0, 0, 0, 0};
+		uint8_t hdr[7] = {0, 0, 0, 0, 0, 0, 0};
+
+		ctx->nss_pin_op(0);
+		ctx->spi_in_out_op(command, hdr, 7);
+		ctx->nss_pin_op(1);
+
+		ENC28_Receive_Status_Vector status_vec;
+		status_vec.packet_len_lo = hdr[3];
+		status_vec.packet_len_hi = hdr[4];
+		*((uint8_t*)&status_vec.status_bits_lo) = hdr[5];
+		*((uint8_t*)&status_vec.status_bits_hi) = hdr[6];
+
+		if (opt_status_vec)
+		{
+			*opt_status_vec = status_vec;
+		}
+
+		if (!status_vec.status_bits_lo.received_ok)
+		{
+			return ENC28_PACKET_RCV_ERR;
+		}
+
+		//TODO: read packet data
+
+		{ // Update ERXDPT according to the errata
+			uint16_t PP = (((hdr[2] & 0x1F) << 8) | hdr[1]);
+			{
+				// update  ERDPT to skip the current packet next time
+				status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTL, hdr[1]);
+				EXIT_IF_ERR(status);
+
+				status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTH, hdr[2]);
+				EXIT_IF_ERR(status);
+			}
+
+			if ((PP -1 > ENC28_CONF_RX_ADDRESS_END) || (PP - 1 < ENC28_CONF_RX_ADDRESS_START) )
+			{
+				PP = ENC28_CONF_RX_ADDRESS_END;
+			}
+			else
+			{
+				PP -= 1;
+			}
+
+			status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTL, PP & 0xFF);
+			EXIT_IF_ERR(status);
+			status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTH, (PP >> 8) & 0x1F);
+			EXIT_IF_ERR(status);
+		}
+
+		status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_ECON2, (1 << ENC28_ECON2_PKTDEC));
+
+		return status;
+	}
+	else if (val & (1 << ENC28_EIR_RXERIF))
+	{
+		status = enc28_select_register_bank(ctx, 0);
+		EXIT_IF_ERR(status);
+
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTL, ENC28_CONF_RX_ADDRESS_END & 0xFF);
+		EXIT_IF_ERR(status);
+		status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTH, (ENC28_CONF_RX_ADDRESS_END >> 8) & 0x1F);
+		EXIT_IF_ERR(status);
+
+		status = enc28_do_clear_bits_ctl_reg(ctx, ENC28_CR_EIR, (1 << ENC28_EIR_RXERIF));
+		EXIT_IF_ERR(status);
+
+		return ENC28_PACKET_RCV_ERR;
+	}
+	else
+	{
+		return ENC28_NO_DATA;
+	}
 }
 
 ENC28_CommandStatus enc28_end_packet_transfer(ENC28_SPI_Context *ctx)

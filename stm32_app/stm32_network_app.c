@@ -70,104 +70,21 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
   status = enc28_begin_packet_transfer(ctx);
   ASSERT_STATUS(status);
 
+  uint8_t pkt_buf[1600];
+
 	while (1)
 	{
 	  if (exti_int_flag)
 	  {
 		  exti_int_flag = 0;
-		  uint8_t val = 0;
-		  status = enc28_do_read_ctl_reg(ctx, ENC28_CR_EIR, &val);
-		  ASSERT_STATUS(status);
-		  if (val & (1 << ENC28_EIR_PKTIF))
+
+		  ENC28_Receive_Status_Vector status_vec;
+		  ENC28_CommandStatus rcv_stat = enc28_read_packet(ctx, pkt_buf, 1600, &status_vec);
+		  while (rcv_stat == ENC28_OK)
 		  {
-			  printf("\n--- Interrupt: %x\n", val);
-			  status = enc28_select_register_bank(ctx, 0);
-			  ASSERT_STATUS(status);
-
-			  uint16_t read_ptr = 0;
-			  status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ERDPTL, &val);
-			  read_ptr = val;
-			  status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ERDPTH, &val);
-			  read_ptr |= ((val & 0x1F) << 8);
-
-			  printf("RDPTR: %d, ST: %d, ND: %d\n", read_ptr, ENC28_CONF_RX_ADDRESS_START, ENC28_CONF_RX_ADDRESS_END);
-
-			  {
-				  uint8_t command[7] = {0x3A, 0, 0, 0, 0, 0, 0};
-				  uint8_t hdr[7] = {0, 0, 0, 0, 0, 0, 0};
-
-				  ctx->nss_pin_op(0);
-				  HAL_StatusTypeDef d = HAL_SPI_TransmitReceive(&hspi2, command, hdr, 7, HAL_MAX_DELAY);
-				  if (d != HAL_OK)
-				  {
-					  for(;;);
-				  }
-				  ctx->nss_pin_op(1);
-				  printf("HDR= %x %x | %x %x %x %x\n", hdr[1], hdr[2], hdr[3], hdr[4], hdr[5], hdr[6]);
-				  uint16_t PP = (((hdr[2] & 0x1F) << 8) | hdr[1]);
-
-
-				  ENC28_Receive_Status_Vector status_vec;
-				  memcpy(&status_vec, hdr + 3, 4);
-
-				  if (!status_vec.status_bits_lo.received_ok)
-				  {
-					  for(;;);
-				  }
-
-				  {
-					  // update  ERDPT to skip the current packet next time
-					  enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTL, hdr[1]);
-					  enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTH, hdr[2]);
-				  }
-
-				  if ((PP -1 > ENC28_CONF_RX_ADDRESS_END) || (PP - 1 < ENC28_CONF_RX_ADDRESS_START) )
-				  {
-					  PP = ENC28_CONF_RX_ADDRESS_END;
-				  }
-				  else
-				  {
-					  PP -= 1;
-				  }
-				  printf("NEXT PP=%d\n", PP);
-
-				  const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
-				  printf("PACKET LEN= %d\n", packet_len);
-
-				  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTL, PP & 0xFF);
-				  ASSERT_STATUS(status);
-				  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTH, (PP >> 8) & 0x1F);
-				  ASSERT_STATUS(status);
-			  }
-
-
-			  {
-				  status = enc28_select_register_bank(ctx, 1);
-				  uint8_t mask;
-				  ASSERT_STATUS(status);
-				  status = enc28_do_read_ctl_reg(ctx, ENC28_CR_EPKTCNT, &mask);
-				  ASSERT_STATUS(status);
-				  printf("PKTCNT = %d\n", (int)mask);
-			  }
-
-			  uint8_t mask = (1 << ENC28_ECON2_PKTDEC);
-			  status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_ECON2, mask);
-			  ASSERT_STATUS(status);
-
-		  }
-		  else if (val & (1 << ENC28_EIR_RXERIF))
-		  {
-			  printf("PACKET RECV ERR\n");
-			  status = enc28_select_register_bank(ctx, 0);
-			  ASSERT_STATUS(status);
-
-			  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTL, ENC28_CONF_RX_ADDRESS_END & 0xFF);
-			  ASSERT_STATUS(status);
-			  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTH, (ENC28_CONF_RX_ADDRESS_END >> 8) & 0x1F);
-			  ASSERT_STATUS(status);
-
-			  status = enc28_do_clear_bits_ctl_reg(ctx, ENC28_CR_EIR, (1 << ENC28_EIR_RXERIF));
-			  ASSERT_STATUS(status);
+			  const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
+			  printf("GOT PACKET, LEN= %d\n", packet_len);
+			  rcv_stat = enc28_read_packet(ctx, pkt_buf, 1600, &status_vec);
 		  }
 	  }
 	}
