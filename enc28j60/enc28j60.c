@@ -58,7 +58,10 @@ static ENC28_CommandStatus priv_enc28_do_buffer_register_init(ENC28_SPI_Context 
 {
 	uint8_t addr_lo = ENC28_CONF_RX_ADDRESS_START & 0xFF;
 	uint8_t addr_hi = (ENC28_CONF_RX_ADDRESS_START >> 8) & 0x1F;
-	ENC28_CommandStatus status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXSTL, addr_lo);
+
+	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 0);
+
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXSTL, addr_lo);
 	EXIT_IF_ERR(status);
 	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXSTH, addr_hi);
 	EXIT_IF_ERR(status);
@@ -70,9 +73,9 @@ static ENC28_CommandStatus priv_enc28_do_buffer_register_init(ENC28_SPI_Context 
 	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXNDH, addr_hi);
 	EXIT_IF_ERR(status);
 
-	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTL, addr_lo);
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTL, addr_lo);
 	EXIT_IF_ERR(status);
-	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTH, addr_hi);
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTH, addr_hi);
 	EXIT_IF_ERR(status);
 
 	return ENC28_OK;
@@ -80,6 +83,7 @@ static ENC28_CommandStatus priv_enc28_do_buffer_register_init(ENC28_SPI_Context 
 
 static ENC28_CommandStatus priv_enc28_do_receive_filter_init(ENC28_SPI_Context *ctx)
 {
+	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 1);
 	return enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXFCON, ENC28_CONF_PACKET_FILTER_MASK);
 }
 
@@ -198,12 +202,9 @@ static ENC28_CommandStatus priv_enc28_do_phy_init(ENC28_SPI_Context *ctx)
 
 ENC28_CommandStatus enc28_do_init(const ENC28_MAC_Address mac_add, ENC28_SPI_Context *ctx)
 {
-	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 0);
-	EXIT_IF_ERR(status);
-
 	// program the ERXST and ERXND pointers
 	// program the ERXRDPT register
-	status = priv_enc28_do_buffer_register_init(ctx);
+	ENC28_CommandStatus status = priv_enc28_do_buffer_register_init(ctx);
 	EXIT_IF_ERR(status);
 
 	// program the "receive filters" in ERXFCON

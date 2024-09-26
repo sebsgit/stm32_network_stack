@@ -71,6 +71,14 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 	  status = enc28_select_register_bank(ctx, 0);
 	  ASSERT_STATUS(status);
 
+	  {
+		  // update  ERDPT to point to the start of the ETH buffer
+		  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTL, ENC28_CONF_RX_ADDRESS_START & 0xFF);
+		  ASSERT_STATUS(status);
+		  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTH, (ENC28_CONF_RX_ADDRESS_START >> 8) & 0x1F);
+		  ASSERT_STATUS(status);
+	  }
+
 	  uint8_t mask = 0;
 	  mask |= (1 << ENC28_EIE_INTIE);
 	  mask |= (1 << ENC28_EIE_PKTIE);
@@ -155,11 +163,10 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 				  const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
 				  printf("PACKET LEN= %d\n", packet_len);
 
-				  //TODO fix handling the ERXRDPT
-				//  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTL, PP & 0xFF);
-				//  ASSERT_STATUS(status);
-				//  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTH, (PP >> 8) & 0x1F);
-				//  ASSERT_STATUS(status);
+				  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTL, PP & 0xFF);
+				  ASSERT_STATUS(status);
+				  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERXRDPTH, (PP >> 8) & 0x1F);
+				  ASSERT_STATUS(status);
 			  }
 
 
