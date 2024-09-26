@@ -640,7 +640,18 @@ ENC28_CommandStatus enc28_read_packet(ENC28_SPI_Context *ctx, uint8_t *packet_bu
 			return ENC28_PACKET_RCV_ERR;
 		}
 
-		//TODO: read packet data
+		{
+			const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
+			if (packet_len > buf_size)
+			{
+				return ENC28_BUFFER_TOO_SMALL;
+			}
+
+			ctx->nss_pin_op(0);
+			ctx->spi_out_op(command, 1);
+			ctx->spi_in_op(packet_buf, packet_len);
+			ctx->nss_pin_op(1);
+		}
 
 		{ // Update ERXDPT according to the errata
 			uint16_t PP = (((hdr[2] & 0x1F) << 8) | hdr[1]);

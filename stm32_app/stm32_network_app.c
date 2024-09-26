@@ -78,12 +78,15 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 	  {
 		  exti_int_flag = 0;
 
+		  memset(pkt_buf, 0xFF, sizeof(pkt_buf));
 		  ENC28_Receive_Status_Vector status_vec;
 		  ENC28_CommandStatus rcv_stat = enc28_read_packet(ctx, pkt_buf, 1600, &status_vec);
 		  while (rcv_stat == ENC28_OK)
 		  {
 			  const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
 			  printf("GOT PACKET, LEN= %d\n", packet_len);
+
+			  memset(pkt_buf, 0xFF, sizeof(pkt_buf));
 			  rcv_stat = enc28_read_packet(ctx, pkt_buf, 1600, &status_vec);
 		  }
 	  }
