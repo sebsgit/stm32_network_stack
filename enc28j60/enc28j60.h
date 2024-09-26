@@ -242,8 +242,19 @@ _Static_assert(sizeof(ENC28_Receive_Status_Vector) == 4);
  * */
 extern ENC28_CommandStatus enc28_do_init(const ENC28_MAC_Address mac_add, ENC28_SPI_Context *ctx);
 
+/**
+ * @brief Sends the reset command
+ * @param ctx The SPI communication context
+ * @return Status of the operation
+ * */
 extern ENC28_CommandStatus enc28_do_soft_reset(ENC28_SPI_Context *ctx);
 
+/**
+ * @brief Reads the PHY hardware ID registers
+ * @param ctx The SPI communication context
+ * @param hw_rev Pointer to the HW revision struct which is filled with the contents of the PHY registers
+ * @return Status of the operation
+ * */
 extern ENC28_CommandStatus enc28_do_read_hw_rev(ENC28_SPI_Context *ctx, ENC28_HW_Rev *hw_rev);
 
 /**
@@ -332,5 +343,19 @@ extern ENC28_CommandStatus enc28_select_register_bank(ENC28_SPI_Context *ctx, co
  * @return The status of the operation
  * */
 extern ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, uint8_t reg_id, uint16_t *reg_value);
+
+/**
+ * @brief Initializes the ETH packet transfer
+ * @param ctx The SPI communication context
+ * @return Status of the operation
+ * */
+extern ENC28_CommandStatus enc28_begin_packet_transfer(ENC28_SPI_Context *ctx);
+
+/**
+ * @brief Stops the ETH packet transfer
+ * @param ctx The SPI communication context
+ * @return Status of the operation
+ * */
+extern ENC28_CommandStatus enc28_end_packet_transfer(ENC28_SPI_Context *ctx);
 
 #endif /* INC_ENC28J60_H_ */

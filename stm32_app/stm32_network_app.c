@@ -67,37 +67,8 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 	  printf("REV ID: %d\n", (int)hw_rev.ethrev);
   }
 
-  { // Setup packet receiving
-	  status = enc28_select_register_bank(ctx, 0);
-	  ASSERT_STATUS(status);
-
-	  {
-		  // update  ERDPT to point to the start of the ETH buffer
-		  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTL, ENC28_CONF_RX_ADDRESS_START & 0xFF);
-		  ASSERT_STATUS(status);
-		  status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTH, (ENC28_CONF_RX_ADDRESS_START >> 8) & 0x1F);
-		  ASSERT_STATUS(status);
-	  }
-
-	  uint8_t mask = 0;
-	  mask |= (1 << ENC28_EIE_INTIE);
-	  mask |= (1 << ENC28_EIE_PKTIE);
-	  mask |= (1 << ENC28_EIE_RXERIE);
-	  status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_EIE, mask);
-	  ASSERT_STATUS(status);
-
-	  mask = (1 << ENC28_EIR_RXERIF);
-	  status = enc28_do_clear_bits_ctl_reg(ctx, ENC28_CR_EIR, mask);
-	  ASSERT_STATUS(status);
-
-	  mask = (1 << ENC28_ECON2_AUTOINC);
-	  status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_ECON2, mask);
-	  ASSERT_STATUS(status);
-
-	  mask = 0;
-	  mask |= (1 << ENC28_ECON1_RXEN);
-	  status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_ECON1, mask);
-  }
+  status = enc28_begin_packet_transfer(ctx);
+  ASSERT_STATUS(status);
 
 	while (1)
 	{
