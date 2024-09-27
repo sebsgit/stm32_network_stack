@@ -5,37 +5,29 @@
 
 #include <FreeRTOS.h>
 #include <task.h>
+#include <queue.h>
 
 #define ASSERT_STATUS(s) if ((s) != ENC28_OK) { for(;;); }
 #define PACKET_HANDLER_STACK_DEPTH_WORDS 600
-#define DEFAULT_TASK_PRIO 1
+#define IP_STACK_TASK_DEPTH_WORDS 1000
+#define PACKET_HANDLER_TASK_PRIO 1
+#define IP_STACK_TASK_PRIO 2
 
 static volatile uint8_t exti_int_flag = 0;
 static TaskHandle_t packet_task_handle;
-
-void enc28_debug_do_reg_dump(ENC28_SPI_Context *ctx)
-{
-	assert(ctx);
-
-	uint8_t reg_id;
-	for (reg_id = 0x0; reg_id <= 0x1F; ++reg_id)
-	{
-		uint8_t reg_value = 0xFF;
-		ENC28_CommandStatus status = enc28_do_read_ctl_reg(ctx, reg_id, &reg_value);
-		if (status == ENC28_OK)
-		{
-			printf("reg read: %d = %d\n", (int)reg_id, (int)reg_value);
-		}
-		else
-		{
-			printf("error reading register %d: err code = %d\n", (int)reg_id, (int)status);
-		}
-	}
-}
+static TaskHandle_t ip_task_handle;
 
 void enc28_test_app_handle_packet_recv_interrupt(void)
 {
 	vTaskNotifyGiveFromISR(packet_task_handle, NULL);
+}
+
+void ip_stack_task(void *arg)
+{
+	while (1)
+	{
+		vTaskDelay(100);
+	}
 }
 
 void packet_handling_task(void * arg)
@@ -106,8 +98,16 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 		  "packet_handler",
 		  PACKET_HANDLER_STACK_DEPTH_WORDS,
 		  ctx,
-		  DEFAULT_TASK_PRIO,
+		  PACKET_HANDLER_TASK_PRIO,
 		  &packet_task_handle);
+  configASSERT(task_status == pdPASS);
+
+  task_status = xTaskCreate(ip_stack_task,
+		  "ip_stack",
+		  IP_STACK_TASK_DEPTH_WORDS,
+		  NULL,
+		  IP_STACK_TASK_PRIO,
+		  &ip_task_handle);
   configASSERT(task_status == pdPASS);
 
   vTaskStartScheduler();
