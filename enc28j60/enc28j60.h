@@ -263,6 +263,14 @@ extern ENC28_CommandStatus enc28_do_soft_reset(ENC28_SPI_Context *ctx);
 extern ENC28_CommandStatus enc28_do_read_hw_rev(ENC28_SPI_Context *ctx, ENC28_HW_Rev *hw_rev);
 
 /**
+ * @brief Reads the internal MAC address registers
+ * @param ctx The SPI communication context
+ * @param mac The output mac address
+ * @return Status of the operation
+ * */
+extern ENC28_CommandStatus enc28_do_read_mac(ENC28_SPI_Context *ctx, ENC28_MAC_Address *mac);
+
+/**
  *  @brief Prepares the "register read" command for the specified control register.
  *  @param out Output buffer for the command data
  *  @param reg_id Register ID to write

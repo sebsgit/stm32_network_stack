@@ -6,6 +6,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include <queue.h>
+#include <lwip/init.h>
 
 #define ASSERT_STATUS(s) if ((s) != ENC28_OK) { for(;;); }
 #define PACKET_HANDLER_STACK_DEPTH_WORDS 600
@@ -13,9 +14,30 @@
 #define PACKET_HANDLER_TASK_PRIO 1
 #define IP_STACK_TASK_PRIO 2
 
+#define MAX_ETH_PACKETS 4
+#define PACKET_PTR_SIZE (sizeof(void*))
+#define STATIC_PACKET_QUEUE_SIZE (MAX_ETH_PACKETS * PACKET_PTR_SIZE)
+
 static volatile uint8_t exti_int_flag = 0;
 static TaskHandle_t packet_task_handle;
 static TaskHandle_t ip_task_handle;
+
+static StaticQueue_t free_packet_buffer_queue_mem;
+static StaticQueue_t ready_packet_buffer_queue_mem;
+static QueueHandle_t free_packet_buffer_queue;
+static QueueHandle_t ready_packet_buffer_queue;
+static uint8_t free_packet_buff_storage[STATIC_PACKET_QUEUE_SIZE];
+static uint8_t ready_packet_buff_storage[STATIC_PACKET_QUEUE_SIZE];
+
+#define MAX_ETH_PACKET_SIZE 1600
+
+struct eth_packet_buff_t
+{
+	uint8_t buf[MAX_ETH_PACKET_SIZE];
+	uint16_t used_bytes;
+};
+
+static struct eth_packet_buff_t eth_packets[MAX_ETH_PACKETS];
 
 void enc28_test_app_handle_packet_recv_interrupt(void)
 {
@@ -24,23 +46,48 @@ void enc28_test_app_handle_packet_recv_interrupt(void)
 
 void ip_stack_task(void *arg)
 {
+	UBaseType_t stack_high_watermark = 0;
+
+	lwip_init();
+
 	while (1)
 	{
-		vTaskDelay(100);
+		struct eth_packet_buff_t * ready_packet = NULL;
+		BaseType_t status = xQueueReceive(ready_packet_buffer_queue, &ready_packet, portMAX_DELAY);
+
+		configASSERT(status == pdPASS);
+		configASSERT(ready_packet);
+
+		{
+			//TODO: push the ETH packet to the lwIP stack
+
+			// put the packet back to the "free" queue
+			xQueueSend(free_packet_buffer_queue, &ready_packet, 0);
+		}
+
+		stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
+		configASSERT(stack_high_watermark > 0); // stack exhausted !
 	}
 }
 
 void packet_handling_task(void * arg)
 {
 	ENC28_SPI_Context *ctx = (ENC28_SPI_Context*)arg;
-	uint8_t pkt_buf[1600];
+	uint8_t pkt_buf[MAX_ETH_PACKET_SIZE];
 	UBaseType_t stack_high_watermark = 0;
 	ENC28_Receive_Status_Vector status_vec;
 	ENC28_CommandStatus rcv_stat;
 
+	for (size_t i = 0; i < sizeof(eth_packets) / sizeof(eth_packets[0]); ++i)
+	{
+		struct eth_packet_buff_t *item = &eth_packets[i];
+		BaseType_t status = xQueueSend(free_packet_buffer_queue, &item, 0);
+		configASSERT(status == pdPASS);
+		memset(&eth_packets[i], 0xFF, sizeof(eth_packets[i]));
+	}
+
 	while (1)
 	{
-		memset(pkt_buf, 0xFF, sizeof(pkt_buf));
 		rcv_stat = enc28_read_packet(ctx, pkt_buf, sizeof(pkt_buf), &status_vec);
 
 		while (rcv_stat == ENC28_OK)
@@ -48,9 +95,21 @@ void packet_handling_task(void * arg)
 			const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
 			printf("GOT PACKET, LEN= %d\n", packet_len);
 
-			memset(pkt_buf, 0xFF, sizeof(pkt_buf));
-			rcv_stat = enc28_read_packet(ctx, pkt_buf, sizeof(pkt_buf), &status_vec);
+			{
+				struct eth_packet_buff_t *free_buf = NULL;
+				BaseType_t status = xQueueReceive(free_packet_buffer_queue, &free_buf, portMAX_DELAY);
 
+				configASSERT(status == pdPASS);
+				configASSERT(free_buf);
+
+				free_buf->used_bytes = packet_len;
+				memcpy(free_buf->buf, pkt_buf, packet_len);
+
+				status = xQueueSend(ready_packet_buffer_queue, &free_buf, portMAX_DELAY);
+				configASSERT(status == pdPASS);
+			}
+
+			rcv_stat = enc28_read_packet(ctx, pkt_buf, sizeof(pkt_buf), &status_vec);
 			stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
 			configASSERT(stack_high_watermark > 0); // stack exhausted !
 		}
@@ -109,6 +168,23 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 		  IP_STACK_TASK_PRIO,
 		  &ip_task_handle);
   configASSERT(task_status == pdPASS);
+
+  free_packet_buffer_queue = xQueueCreateStatic(
+		  MAX_ETH_PACKETS,
+		  PACKET_PTR_SIZE,
+		  free_packet_buff_storage,
+		  &free_packet_buffer_queue_mem);
+  configASSERT(free_packet_buffer_queue);
+
+  ready_packet_buffer_queue = xQueueCreateStatic(
+		  MAX_ETH_PACKETS,
+		  PACKET_PTR_SIZE,
+		  ready_packet_buff_storage,
+		  &ready_packet_buffer_queue_mem);
+  configASSERT(ready_packet_buffer_queue);
+
+  vQueueAddToRegistry(ready_packet_buffer_queue, "ready_packet");
+  vQueueAddToRegistry(free_packet_buffer_queue, "free_packet");
 
   vTaskStartScheduler();
 }

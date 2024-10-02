@@ -275,6 +275,25 @@ ENC28_CommandStatus enc28_do_read_hw_rev(ENC28_SPI_Context *ctx, ENC28_HW_Rev *h
 	return status;
 }
 
+ENC28_CommandStatus enc28_do_read_mac(ENC28_SPI_Context *ctx, ENC28_MAC_Address *mac)
+{
+	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 3);
+	EXIT_IF_ERR(status);
+	status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MAC_ADD1, &mac->addr[0]);
+	EXIT_IF_ERR(status);
+	status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MAC_ADD2, &mac->addr[1]);
+	EXIT_IF_ERR(status);
+	status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MAC_ADD3, &mac->addr[2]);
+	EXIT_IF_ERR(status);
+	status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MAC_ADD4, &mac->addr[3]);
+	EXIT_IF_ERR(status);
+	status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MAC_ADD5, &mac->addr[4]);
+	EXIT_IF_ERR(status);
+	status = enc28_do_read_ctl_reg(ctx, ENC28_CR_MAC_ADD6, &mac->addr[5]);
+
+	return status;
+}
+
 ENC28_CommandStatus enc28_prepare_read_ctl_reg(uint8_t *out, uint8_t reg_id)
 {
 	CHECK_RESERVED_REG(reg_id);
