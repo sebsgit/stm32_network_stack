@@ -33,7 +33,7 @@
 #define ENC28_EIE_TXIE		(3)		/* Transmit Enable bit */
 #define ENC28_EIE_LINKIE	(4)		/* Link Status Change Interrupt Enable bit */
 #define ENC28_EIE_DMAIE		(5)		/* DMA Interrupt Enable bit */
-#define ENC28_EIE_PKTIE		(6)		/* Reeive Packet Pending Interrupt Enable bit */
+#define ENC28_EIE_PKTIE		(6)		/* Receive Packet Pending Interrupt Enable bit */
 #define ENC28_EIE_INTIE		(7)		/* Global Interrupt Enable bit */
 
 #define ENC28_CR_EIR		(0x1C)	/* Ethernet Interrupt Request register */
@@ -364,7 +364,29 @@ extern ENC28_CommandStatus enc28_do_read_phy_register(ENC28_SPI_Context *ctx, ui
  * */
 extern ENC28_CommandStatus enc28_begin_packet_transfer(ENC28_SPI_Context *ctx);
 
+/**
+ * @brief Attempts to read one incoming ETH packet
+ * @param ctx The SPI communication context
+ * @param packet_buf The output buffer
+ * @param buf_size The output buffer size
+ * @param opt_status_vec The status vector, can be NULL
+ * */
 extern ENC28_CommandStatus enc28_read_packet(ENC28_SPI_Context *ctx, uint8_t *packet_buf, uint16_t buf_size, ENC28_Receive_Status_Vector *opt_status_vec);
+
+/**
+ * @brief Sends the data packet
+ * @param ctx The SPI communication context
+ * @param packet_buf The Ethernet packet to send (Destination MAC | Source MAC | Type/Length | Payload)
+ * @param buf_size The size of @p packet_buf
+ * @note This is a non-blocking call. @see enc28_check_outgoing_packet_status
+ * */
+extern ENC28_CommandStatus enc28_write_packet(ENC28_SPI_Context *ctx, const uint8_t *packet_buf, uint16_t buf_size);
+
+/**
+ * @brief Query the output packet status
+ * @note This function should be used after the application receives the interrupt on the INT pin of ENC28 device
+ * */
+extern ENC28_CommandStatus enc28_check_outgoing_packet_status(ENC28_SPI_Context *ctx);
 
 /**
  * @brief Stops the ETH packet transfer

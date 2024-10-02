@@ -597,6 +597,7 @@ ENC28_CommandStatus enc28_begin_packet_transfer(ENC28_SPI_Context *ctx)
 	mask |= (1 << ENC28_EIE_INTIE);
 	mask |= (1 << ENC28_EIE_PKTIE);
 	mask |= (1 << ENC28_EIE_RXERIE);
+	mask |= (1 << ENC28_EIE_TXERIE);
 	status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_EIE, mask);
 	EXIT_IF_ERR(status);
 
@@ -721,6 +722,31 @@ ENC28_CommandStatus enc28_read_packet(ENC28_SPI_Context *ctx, uint8_t *packet_bu
 	{
 		return ENC28_NO_DATA;
 	}
+}
+
+ENC28_CommandStatus enc28_write_packet(ENC28_SPI_Context *ctx, const uint8_t *packet_buf, uint16_t buf_size)
+{
+	if ((!ctx) || !(packet_buf) || (buf_size < 14))
+	{
+		return ENC28_INVALID_PARAM;
+	}
+
+	//TODO:
+	// 1.  program ETXST pointer
+	// 2.1 write the control byte
+	// 2.2 transfer the data using the "WBM" SPI command
+	// 3.  program ETXND to point to the last byte in the packet
+	// 4.  clear EIR.TXIF
+	// 5.  start the transmission by setting ECON1.TXRTS
+
+	return ENC28_OK;
+}
+
+ENC28_CommandStatus enc28_check_outgoing_packet_status(ENC28_SPI_Context *ctx)
+{
+	//TODO check EIR.TXIF -> check ESTAT.TXABRT -> check ESTAT.LATECOL
+	//TODO read the transmission status vector from ETXND + 1
+	return ENC28_OK;
 }
 
 ENC28_CommandStatus enc28_end_packet_transfer(ENC28_SPI_Context *ctx)
