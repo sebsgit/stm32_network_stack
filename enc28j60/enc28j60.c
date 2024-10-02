@@ -130,7 +130,8 @@ static ENC28_CommandStatus priv_enc28_do_mac_init(const ENC28_MAC_Address mac_ad
 
 	{
 		uint8_t macon3_mask = ENC28_CONF_MACON3_FRAME_PAD_MASK |
-					(1 << ENC28_MACON3_TXCRCEN);
+					(1 << ENC28_MACON3_TXCRCEN) |
+					(1 << ENC28_MACON3_FRMLNEN);
 		if (is_full_duplex)
 		{
 			macon3_mask |= (1 << ENC28_MACON3_FULLDPX);

@@ -68,6 +68,7 @@
 #define ENC28_CR_MACON3			(0x2)	/* MAC control register 3 */
 #define ENC28_MACON3_TXCRCEN	(0x4)	/* Transmit CRC Enable bit */
 #define ENC28_MACON3_FULLDPX	(0x0)	/* Full-Duplex Enable bit */
+#define ENC28_MACON3_FRMLNEN	(0x1)	/* Frame Length Checking Enable bit */
 
 #define ENC28_CR_MACON4		(0x3)	/* MAC control register 4 */
 #define ENC28_MACON4_DEFER	(0x4)	/* Defer Transmission Enable bit */
