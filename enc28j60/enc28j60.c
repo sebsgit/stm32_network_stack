@@ -732,22 +732,132 @@ ENC28_CommandStatus enc28_write_packet(ENC28_SPI_Context *ctx, const uint8_t *pa
 		return ENC28_INVALID_PARAM;
 	}
 
-	//TODO:
-	// 1.  program ETXST pointer
-	// 2.1 write the control byte
-	// 2.2 transfer the data using the "WBM" SPI command
-	// 3.  program ETXND to point to the last byte in the packet
-	// 4.  clear EIR.TXIF
-	// 5.  start the transmission by setting ECON1.TXRTS
+	{
+		uint8_t reg_val;
+		ENC28_CommandStatus status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ECON1, &reg_val);
+		EXIT_IF_ERR(status);
 
-	return ENC28_OK;
+		if (reg_val & (1 << ENC28_ECON1_TXRTS))
+		{
+			return ENC28_PACKET_TX_IN_PROGRESS;
+		}
+	}
+
+	// 1.  program ETXST pointer
+	ENC28_CommandStatus status = enc28_select_register_bank(ctx, 0);
+	EXIT_IF_ERR(status);
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ETXSTL, ENC28_CONF_TX_ADDRESS_START & 0xFF);
+	EXIT_IF_ERR(status);
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ETXSTH, (ENC28_CONF_TX_ADDRESS_START >> 8) & 0x1F);
+	EXIT_IF_ERR(status);
+
+	// prepare EWRPT
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_EWRPTL, ENC28_CONF_TX_ADDRESS_START & 0xFF);
+	EXIT_IF_ERR(status);
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_EWRPTH, (ENC28_CONF_TX_ADDRESS_START >> 8) & 0x1F);
+	EXIT_IF_ERR(status);
+
+	// 2.1 write the control byte
+	const uint8_t control_code[] = {0x7A, 0}; // WBM ctrl code, transmission ctrl code
+
+	// 2.2 transfer the data using the "WBM" SPI command
+	ctx->nss_pin_op(0);
+	ctx->spi_out_op(control_code, 2);
+	ctx->spi_out_op(packet_buf, buf_size);
+	ctx->nss_pin_op(1);
+
+	const uint16_t end_address = ENC28_CONF_TX_ADDRESS_START + buf_size + 1;
+
+	// 3.  program ETXND to point to the last byte in the packet
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ETXNDL, end_address & 0xFF);
+	EXIT_IF_ERR(status);
+	status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ETXNDH, (end_address >> 8) & 0x1F);
+	EXIT_IF_ERR(status);
+
+	// 4.  clear EIR.TXIF
+	status = enc28_do_clear_bits_ctl_reg(ctx, ENC28_CR_EIR, 1 << ENC28_EIR_TXIF);
+	EXIT_IF_ERR(status);
+
+	// 5.0 ERRATA: Point 10: transmit logic force reset
+
+	status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_ECON1, 1 << ENC28_ECON1_TX_RST);
+	EXIT_IF_ERR(status);
+	status = enc28_do_clear_bits_ctl_reg(ctx, ENC28_CR_ECON1, 1 << ENC28_ECON1_TX_RST);
+	EXIT_IF_ERR(status);
+
+	// 5.  start the transmission by setting ECON1.TXRTS
+	status = enc28_do_set_bits_ctl_reg(ctx, ENC28_CR_ECON1, 1 << ENC28_ECON1_TXRTS);
+
+	return status;
 }
 
 ENC28_CommandStatus enc28_check_outgoing_packet_status(ENC28_SPI_Context *ctx)
 {
-	//TODO check EIR.TXIF -> check ESTAT.TXABRT -> check ESTAT.LATECOL
-	//TODO read the transmission status vector from ETXND + 1
-	return ENC28_OK;
+	uint8_t reg_val = 0;
+	ENC28_CommandStatus status = enc28_do_read_ctl_reg(ctx, ENC28_CR_EIR, &reg_val);
+	EXIT_IF_ERR(status);
+
+	if (reg_val & (1 << ENC28_EIR_TXIF))
+	{
+		status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ESTAT, &reg_val);
+		EXIT_IF_ERR(status);
+
+		{
+			//TODO read the transmission status vector from ETXND + 1
+
+			uint8_t rdpt_lo = 0;
+			uint8_t rdpt_hi = 0;
+			uint8_t end_addr_lo = 0;
+			uint8_t end_addr_hi = 0;
+			status = enc28_select_register_bank(ctx, 0);
+			EXIT_IF_ERR(status);
+
+			// backup RDPT
+			status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ERDPTL, &rdpt_lo);
+			EXIT_IF_ERR(status);
+			status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ERDPTH, &rdpt_hi);
+			EXIT_IF_ERR(status);
+
+			status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ETXNDL, &end_addr_lo);
+			EXIT_IF_ERR(status);
+			status = enc28_do_read_ctl_reg(ctx, ENC28_CR_ETXNDH, &end_addr_hi);
+			EXIT_IF_ERR(status);
+
+			uint16_t ctl_vec_addr = (end_addr_lo) | ((end_addr_hi << 8) & 0x1F);
+			ctl_vec_addr += 1;
+
+			// start reading Transmit Status Vector at TXND + 1
+			status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTL, ctl_vec_addr & 0xFF);
+			EXIT_IF_ERR(status);
+			status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTH, (ctl_vec_addr >> 8) & 0x1F);
+			EXIT_IF_ERR(status);
+
+			uint8_t command[1 + 7] = {0x3A, 0, 0, 0, 0, 0, 0, 0};
+			uint8_t hdr[1 + 7] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+			ctx->nss_pin_op(0);
+			ctx->spi_in_out_op(command, hdr, 7);
+			ctx->nss_pin_op(1);
+
+			// TODO copy Transmit Status Vector from hdr + 1
+
+			// restore RDPT
+			status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTL, rdpt_lo);
+			EXIT_IF_ERR(status);
+			status = enc28_do_write_ctl_reg(ctx, ENC28_CR_ERDPTH, rdpt_hi);
+			EXIT_IF_ERR(status);
+
+		}
+
+		if (reg_val & (1 << ENC28_ESTAT_TXABRT))
+		{
+			//TODO check EIR.TXIF -> check ESTAT.TXABRT -> check ESTAT.LATECOL
+			return ENC28_PACKET_TX_ABORTED;
+		}
+		return ENC28_OK;
+	}
+
+	return ENC28_NO_DATA;
 }
 
 ENC28_CommandStatus enc28_end_packet_transfer(ENC28_SPI_Context *ctx)

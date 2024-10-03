@@ -107,6 +107,12 @@
 
 #define ENC28_CR_ERDPTL		(0x00)		/* Receive read pointer address, low byte */
 #define ENC28_CR_ERDPTH		(0x01)		/* Receive read pointer address, high byte */
+#define ENC28_CR_EWRPTL		(0x02)		/* Write pointer address, low byte */
+#define ENC28_CR_EWRPTH		(0x03)		/* Write pointer address, high byte */
+#define ENC28_CR_ETXSTL		(0x04)		/* Transmit read pointer start address, low byte */
+#define ENC28_CR_ETXSTH		(0x05)		/* Transmit read pointer start address, high byte */
+#define ENC28_CR_ETXNDL		(0x06)		/* Transmit read pointer end address, low byte */
+#define ENC28_CR_ETXNDH		(0x07)		/* Transmit read pointer end address, high byte */
 #define ENC28_CR_ERXSTL		(0x08)		/* Receive buffer address start, low byte */
 #define ENC28_CR_ERXSTH		(0x09)		/* Receive buffer address start, high byte */
 #define ENC28_CR_ERXNDL		(0x0A)		/* Receive buffer address end, low byte */
@@ -118,6 +124,8 @@
 
 #define ENC28_CR_ESTAT		(0x1D)		/* Status register */
 #define ENC28_ESTAT_CLKRDY	(0)			/* ESTAT clock ready bit */
+#define ENC28_ESTAT_TXABRT	(1)			/* ESTAT transmission aborted bit */
+#define ENC28_ESTAT_LATECOL	(4)			/* ESTAT Late Collision Error bit*/
 
 #define ENC28_CR_ERXFCON	(0x18)		/* Packet filter register */
 #define ENC28_ERXFCON_UNI	(1 << 7)	/* Unicast packet filter bit */
@@ -140,6 +148,10 @@
 
 #ifndef ENC28_CONF_RX_ADDRESS_END
 #define ENC28_CONF_RX_ADDRESS_END	(0x1eff)	/* Default end address of the packet receive buffer */
+#endif
+
+#ifndef ENC28_CONF_TX_ADDRESS_START
+#define ENC28_CONF_TX_ADDRESS_START (0x1D)
 #endif
 
 #ifndef ENC28_CONF_PACKET_FILTER_MASK
@@ -178,7 +190,9 @@ typedef enum
 	ENC28_NO_DATA,
 	ENC28_READ_PTR_OUT_OF_RANGE,
 	ENC28_BUFFER_TOO_SMALL,
-	ENC28_PACKET_RCV_ERR
+	ENC28_PACKET_RCV_ERR,
+	ENC28_PACKET_TX_IN_PROGRESS,
+	ENC28_PACKET_TX_ABORTED
 } ENC28_CommandStatus;
 
 typedef struct

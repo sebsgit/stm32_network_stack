@@ -8,6 +8,8 @@
 #include <queue.h>
 #include <lwip/init.h>
 
+#include <debug/enc28_debug.h>
+
 #define ASSERT_STATUS(s) if ((s) != ENC28_OK) { for(;;); }
 #define PACKET_HANDLER_STACK_DEPTH_WORDS 600
 #define IP_STACK_TASK_DEPTH_WORDS 1000
@@ -109,12 +111,66 @@ void packet_handling_task(void * arg)
 				configASSERT(status == pdPASS);
 			}
 
+			//TODO debug: handle ping requests
+			{
+				struct enc28_eth_header hdr;
+				memcpy(&hdr, pkt_buf, sizeof(hdr));
+
+				if ((hdr.type_len == 0x08))
+				{
+					// ipv4 frame
+					struct enc28_ipv4_header ipv4;
+					memcpy(&ipv4, pkt_buf + sizeof(hdr), sizeof(ipv4));
+
+					if (ipv4.protocol == 0x1)
+					{
+						// ICMP
+						struct enc28_icmp_ping_header icmp;
+						memcpy(&icmp, pkt_buf + sizeof(hdr) + sizeof(ipv4), sizeof(icmp));
+
+						if (icmp.type == 0x8)
+						{
+							// it's a ping request, send the ping reply
+							uint8_t addr_buf[6];
+							memcpy(addr_buf, hdr.mac_dest, sizeof(hdr.mac_dest));
+							memcpy(hdr.mac_dest, hdr.mac_src, sizeof(hdr.mac_dest));
+							memcpy(hdr.mac_src, addr_buf, sizeof(hdr.mac_src));
+
+							memcpy(addr_buf, ipv4.addr_dest, sizeof(ipv4.addr_dest));
+							memcpy(ipv4.addr_dest, ipv4.addr_src, sizeof(ipv4.addr_dest));
+							memcpy(ipv4.addr_src, addr_buf, sizeof(ipv4.addr_src));
+
+							icmp.type = 0x0; // ping response
+							icmp.checksum += 0x8; // adjust checksum
+
+							memcpy(pkt_buf, &hdr, sizeof(hdr));
+							memcpy(pkt_buf + sizeof(hdr), &ipv4, sizeof(ipv4));
+							memcpy(pkt_buf + sizeof(hdr) + sizeof(ipv4), &icmp, sizeof(icmp));
+
+							ENC28_CommandStatus send_stat = enc28_write_packet(ctx, pkt_buf, packet_len);
+							configASSERT(send_stat == ENC28_OK);
+
+						}
+					}
+				}
+			}
+
 			rcv_stat = enc28_read_packet(ctx, pkt_buf, sizeof(pkt_buf), &status_vec);
 			stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
 			configASSERT(stack_high_watermark > 0); // stack exhausted !
 		}
 
-		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		{
+			ENC28_CommandStatus send_stat = enc28_check_outgoing_packet_status(ctx);
+			if (send_stat == ENC28_OK)
+			{
+			//	printf("Packet sent\n");
+			}
+			stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
+			configASSERT(stack_high_watermark > 0); // stack exhausted !
+		}
+
+		ulTaskNotifyTake(pdTRUE, 10);
 	}
 }
 
