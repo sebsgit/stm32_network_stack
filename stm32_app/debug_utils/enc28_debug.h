@@ -38,4 +38,7 @@ struct enc28_icmp_ping_header
 	uint16_t seq_num;
 };
 
+extern uint8_t enc28_debug_is_ping_request(const uint8_t *pkt_buf, uint16_t pkt_size);
+extern int32_t enc28_debug_handle_ping(const uint8_t *pkt_buf, uint16_t pkt_size, uint8_t *resp_buf, uint16_t resp_size);
+
 #endif /* ENC28_DEBUG_H_ */

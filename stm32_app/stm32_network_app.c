@@ -8,7 +8,7 @@
 #include <queue.h>
 #include <lwip/init.h>
 
-#include <debug/enc28_debug.h>
+#include <debug_utils/enc28_debug.h>
 
 #define ASSERT_STATUS(s) if ((s) != ENC28_OK) { for(;;); }
 #define PACKET_HANDLER_STACK_DEPTH_WORDS 600
@@ -16,7 +16,7 @@
 #define PACKET_HANDLER_TASK_PRIO 1
 #define IP_STACK_TASK_PRIO 2
 
-#define MAX_ETH_PACKETS 4
+#define MAX_ETH_PACKETS 8
 #define PACKET_PTR_SIZE (sizeof(void*))
 #define STATIC_PACKET_QUEUE_SIZE (MAX_ETH_PACKETS * PACKET_PTR_SIZE)
 
@@ -26,10 +26,13 @@ static TaskHandle_t ip_task_handle;
 
 static StaticQueue_t free_packet_buffer_queue_mem;
 static StaticQueue_t ready_packet_buffer_queue_mem;
+static StaticQueue_t transmit_packet_queue_mem;
 static QueueHandle_t free_packet_buffer_queue;
 static QueueHandle_t ready_packet_buffer_queue;
+static QueueHandle_t transmit_packet_queue;
 static uint8_t free_packet_buff_storage[STATIC_PACKET_QUEUE_SIZE];
 static uint8_t ready_packet_buff_storage[STATIC_PACKET_QUEUE_SIZE];
+static uint8_t transmit_packet_storage[STATIC_PACKET_QUEUE_SIZE];
 
 #define MAX_ETH_PACKET_SIZE 1600
 
@@ -62,6 +65,29 @@ void ip_stack_task(void *arg)
 
 		{
 			//TODO: push the ETH packet to the lwIP stack
+
+			if (enc28_debug_is_ping_request(ready_packet->buf, ready_packet->used_bytes))
+			{
+				struct eth_packet_buff_t *ping_resp = NULL;
+				status = xQueueReceive(free_packet_buffer_queue, &ping_resp, 0);
+				if (status == pdPASS)
+				{
+					ping_resp->used_bytes = ready_packet->used_bytes;
+					int32_t resp_status = enc28_debug_handle_ping(ready_packet->buf,
+							ready_packet->used_bytes,
+							ping_resp->buf,
+							ping_resp->used_bytes);
+					if (resp_status == 0)
+					{
+						//TODO put into "transmit" queue
+						xQueueSend(transmit_packet_queue, &ping_resp, 0);
+					}
+					else
+					{
+						xQueueSend(free_packet_buffer_queue, &ping_resp, 0);
+					}
+				}
+			}
 
 			// put the packet back to the "free" queue
 			xQueueSend(free_packet_buffer_queue, &ready_packet, 0);
@@ -111,61 +137,24 @@ void packet_handling_task(void * arg)
 				configASSERT(status == pdPASS);
 			}
 
-			//TODO debug: handle ping requests
-			{
-				struct enc28_eth_header hdr;
-				memcpy(&hdr, pkt_buf, sizeof(hdr));
-
-				if ((hdr.type_len == 0x08))
-				{
-					// ipv4 frame
-					struct enc28_ipv4_header ipv4;
-					memcpy(&ipv4, pkt_buf + sizeof(hdr), sizeof(ipv4));
-
-					if (ipv4.protocol == 0x1)
-					{
-						// ICMP
-						struct enc28_icmp_ping_header icmp;
-						memcpy(&icmp, pkt_buf + sizeof(hdr) + sizeof(ipv4), sizeof(icmp));
-
-						if (icmp.type == 0x8)
-						{
-							// it's a ping request, send the ping reply
-							uint8_t addr_buf[6];
-							memcpy(addr_buf, hdr.mac_dest, sizeof(hdr.mac_dest));
-							memcpy(hdr.mac_dest, hdr.mac_src, sizeof(hdr.mac_dest));
-							memcpy(hdr.mac_src, addr_buf, sizeof(hdr.mac_src));
-
-							memcpy(addr_buf, ipv4.addr_dest, sizeof(ipv4.addr_dest));
-							memcpy(ipv4.addr_dest, ipv4.addr_src, sizeof(ipv4.addr_dest));
-							memcpy(ipv4.addr_src, addr_buf, sizeof(ipv4.addr_src));
-
-							icmp.type = 0x0; // ping response
-							icmp.checksum += 0x8; // adjust checksum
-
-							memcpy(pkt_buf, &hdr, sizeof(hdr));
-							memcpy(pkt_buf + sizeof(hdr), &ipv4, sizeof(ipv4));
-							memcpy(pkt_buf + sizeof(hdr) + sizeof(ipv4), &icmp, sizeof(icmp));
-
-							ENC28_CommandStatus send_stat = enc28_write_packet(ctx, pkt_buf, packet_len);
-							configASSERT(send_stat == ENC28_OK);
-
-						}
-					}
-				}
-			}
-
 			rcv_stat = enc28_read_packet(ctx, pkt_buf, sizeof(pkt_buf), &status_vec);
 			stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
 			configASSERT(stack_high_watermark > 0); // stack exhausted !
 		}
 
+
 		{
-			ENC28_CommandStatus send_stat = enc28_check_outgoing_packet_status(ctx);
-			if (send_stat == ENC28_OK)
 			{
-			//	printf("Packet sent\n");
+				struct eth_packet_buff_t *to_send = NULL;
+				BaseType_t status = xQueueReceive(transmit_packet_queue, &to_send, 0);
+				if (status == pdPASS)
+				{
+					ENC28_CommandStatus send_stat = enc28_write_packet(ctx, to_send->buf, to_send->used_bytes);
+					configASSERT(send_stat == ENC28_OK);
+					xQueueSend(free_packet_buffer_queue, &to_send, 0);
+				}
 			}
+
 			stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
 			configASSERT(stack_high_watermark > 0); // stack exhausted !
 		}
@@ -239,8 +228,15 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
 		  &ready_packet_buffer_queue_mem);
   configASSERT(ready_packet_buffer_queue);
 
-  vQueueAddToRegistry(ready_packet_buffer_queue, "ready_packet");
-  vQueueAddToRegistry(free_packet_buffer_queue, "free_packet");
+  transmit_packet_queue = xQueueCreateStatic(
+		  MAX_ETH_PACKETS,
+		  PACKET_PTR_SIZE,
+		  transmit_packet_storage,
+		  &transmit_packet_queue_mem);
+
+  vQueueAddToRegistry(ready_packet_buffer_queue, "ready_packets");
+  vQueueAddToRegistry(free_packet_buffer_queue, "free_packets");
+  vQueueAddToRegistry(transmit_packet_queue, "transmit_queue");
 
   vTaskStartScheduler();
 }
