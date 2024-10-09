@@ -20,7 +20,9 @@
 /* Disable OS layer inter-task protection feature */
 #define SYS_LIGHTWEIGHT_PROT 0
 
-/* Disable timers support */
-#define LWIP_TIMERS 0
+/* Enable timers support */
+#define LWIP_TIMERS 1
+
+#define LWIP_PBUF_CUSTOM_DATA void *enc28_eth_packet_ptr;
 
 #endif /* INC_LWIPOPTS_H_ */
