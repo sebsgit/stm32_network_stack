@@ -31,6 +31,7 @@
 
 #include "stm32_network_app.h"
 #include "eth_packet_buff.h"
+#include "debug_utils/enc28_debug.h"
 #include <FreeRTOS.h>
 #include <queue.h>
 #include <lwip/init.h>

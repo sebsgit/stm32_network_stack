@@ -28,11 +28,7 @@
  *
  * Implementation of the test application for the ENC28J60 driver.
  * */
-
-#include "enc28j60.h"
-#include "eth_packet_buff.h"
 #include "stm32_network_app.h"
-#include "debug_utils/enc28_debug.h"
 
 #include <assert.h>
 #include <stdio.h>
