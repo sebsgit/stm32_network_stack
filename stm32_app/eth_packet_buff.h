@@ -24,26 +24,22 @@
  */
 
 /*
- * stm32_network_app.h
+ * eth_packet_buff.h
  *
+ * Ethernet packet buffer structure
  * */
 
-#ifndef STM32_NETWORK_APP_H_
-#define STM32_NETWORK_APP_H_
+#ifndef ETH_PACKET_BUFF_H_
+#define ETH_PACKET_BUFF_H_
 
-#include "enc28j60.h"
+#include <stdint.h>
 
-/* Maximum number of ethernet packets in use */
-#define MAX_ETH_PACKETS 8
+#define MAX_ETH_PACKET_SIZE 1600
 
-/*
- * @brief Handles the interrupt from ENC28J60 module. Should be called in the GPIO interrupt handler.
- * */
-extern void enc28_test_app_handle_packet_recv_interrupt(void);
+struct eth_packet_buff_t
+{
+	uint8_t buf[MAX_ETH_PACKET_SIZE];
+	uint16_t used_bytes;
+};
 
-/*
- * @brief Entry point for the ENC28J60 driver test application. Does not return.
- * */
-extern void enc28_test_app(ENC28_SPI_Context *ctx);
-
-#endif /* STM32_NETWORK_APP_H_ */
+#endif /* ETH_PACKET_BUFF_H_ */

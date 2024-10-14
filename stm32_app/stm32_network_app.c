@@ -1,4 +1,39 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2024 Sebastian Baginski
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ */
+
+/*
+ * stm32_network_app.c
+ *
+ * Implementation of the test application for the ENC28J60 driver.
+ * */
+
 #include "enc28j60.h"
+#include "eth_packet_buff.h"
+#include "stm32_network_app.h"
+#include "debug_utils/enc28_debug.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,8 +47,6 @@
 #include <lwip/etharp.h>
 #include <lwip/timeouts.h>
 
-#include <debug_utils/enc28_debug.h>
-
 /*TODO:
  * - cleanup
  */
@@ -24,7 +57,6 @@
 #define PACKET_HANDLER_TASK_PRIO 1
 #define IP_STACK_TASK_PRIO 2
 
-#define MAX_ETH_PACKETS 8
 #define PACKET_PTR_SIZE (sizeof(void*))
 #define STATIC_PACKET_QUEUE_SIZE (MAX_ETH_PACKETS * PACKET_PTR_SIZE)
 #define USE_LWIP (1)
@@ -36,22 +68,12 @@ static TaskHandle_t ip_task_handle;
 static StaticQueue_t free_packet_buffer_queue_mem;
 static StaticQueue_t ready_packet_buffer_queue_mem;
 static StaticQueue_t transmit_packet_queue_mem;
-static QueueHandle_t free_packet_buffer_queue;
-static QueueHandle_t ready_packet_buffer_queue;
-static QueueHandle_t transmit_packet_queue;
 static uint8_t free_packet_buff_storage[STATIC_PACKET_QUEUE_SIZE];
 static uint8_t ready_packet_buff_storage[STATIC_PACKET_QUEUE_SIZE];
 static uint8_t transmit_packet_storage[STATIC_PACKET_QUEUE_SIZE];
-
-#define MAX_ETH_PACKET_SIZE 1600
-
-struct eth_packet_buff_t
-{
-	uint8_t buf[MAX_ETH_PACKET_SIZE];
-	uint16_t used_bytes;
-};
-
-static struct eth_packet_buff_t eth_packets[MAX_ETH_PACKETS];
+QueueHandle_t free_packet_buffer_queue;
+QueueHandle_t ready_packet_buffer_queue;
+QueueHandle_t transmit_packet_queue;
 
 extern uint32_t HAL_GetTick(void);
 
@@ -147,7 +169,6 @@ void ip_stack_task(void *arg)
 							ping_resp->used_bytes);
 					if (resp_status == 0)
 					{
-						//TODO put into "transmit" queue
 						xQueueSend(transmit_packet_queue, &ping_resp, 0);
 					}
 					else
@@ -183,70 +204,7 @@ void ip_stack_task(void *arg)
 	}
 }
 
-void packet_handling_task(void * arg)
-{
-	ENC28_SPI_Context *ctx = (ENC28_SPI_Context*)arg;
-	uint8_t pkt_buf[MAX_ETH_PACKET_SIZE];
-	UBaseType_t stack_high_watermark = 0;
-	ENC28_Receive_Status_Vector status_vec;
-	ENC28_CommandStatus rcv_stat;
-
-	for (size_t i = 0; i < sizeof(eth_packets) / sizeof(eth_packets[0]); ++i)
-	{
-		struct eth_packet_buff_t *item = &eth_packets[i];
-		BaseType_t status = xQueueSend(free_packet_buffer_queue, &item, 0);
-		configASSERT(status == pdPASS);
-		memset(&eth_packets[i], 0xFF, sizeof(eth_packets[i]));
-	}
-
-	while (1)
-	{
-		rcv_stat = enc28_read_packet(ctx, pkt_buf, sizeof(pkt_buf), &status_vec);
-
-		while (rcv_stat == ENC28_OK)
-		{
-			const uint16_t packet_len = (status_vec.packet_len_hi << 8) | status_vec.packet_len_lo;
-			printf("GOT PACKET, LEN= %d\n", packet_len);
-
-			{
-				struct eth_packet_buff_t *free_buf = NULL;
-				BaseType_t status = xQueueReceive(free_packet_buffer_queue, &free_buf, portMAX_DELAY);
-
-				configASSERT(status == pdPASS);
-				configASSERT(free_buf);
-
-				free_buf->used_bytes = packet_len;
-				memcpy(free_buf->buf, pkt_buf, packet_len);
-
-				status = xQueueSend(ready_packet_buffer_queue, &free_buf, portMAX_DELAY);
-				configASSERT(status == pdPASS);
-			}
-
-			rcv_stat = enc28_read_packet(ctx, pkt_buf, sizeof(pkt_buf), &status_vec);
-			stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
-			configASSERT(stack_high_watermark > 0); // stack exhausted !
-		}
-
-
-		{
-			{
-				struct eth_packet_buff_t *to_send = NULL;
-				BaseType_t status = xQueueReceive(transmit_packet_queue, &to_send, 0);
-				if (status == pdPASS)
-				{
-					ENC28_CommandStatus send_stat = enc28_write_packet(ctx, to_send->buf, to_send->used_bytes);
-					configASSERT(send_stat == ENC28_OK);
-					xQueueSend(free_packet_buffer_queue, &to_send, 0);
-				}
-			}
-
-			stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
-			configASSERT(stack_high_watermark > 0); // stack exhausted !
-		}
-
-		ulTaskNotifyTake(pdTRUE, 10);
-	}
-}
+extern void packet_handling_task(void * arg);
 
 void enc28_test_app(ENC28_SPI_Context *ctx)
 {

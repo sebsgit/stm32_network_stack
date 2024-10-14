@@ -24,26 +24,7 @@
  */
 
 /*
- * stm32_network_app.h
+ * ip_stack_task.c
  *
+ * Implementation of the IP stack task
  * */
-
-#ifndef STM32_NETWORK_APP_H_
-#define STM32_NETWORK_APP_H_
-
-#include "enc28j60.h"
-
-/* Maximum number of ethernet packets in use */
-#define MAX_ETH_PACKETS 8
-
-/*
- * @brief Handles the interrupt from ENC28J60 module. Should be called in the GPIO interrupt handler.
- * */
-extern void enc28_test_app_handle_packet_recv_interrupt(void);
-
-/*
- * @brief Entry point for the ENC28J60 driver test application. Does not return.
- * */
-extern void enc28_test_app(ENC28_SPI_Context *ctx);
-
-#endif /* STM32_NETWORK_APP_H_ */
