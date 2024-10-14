@@ -69,6 +69,7 @@ void enc28_test_app_handle_packet_recv_interrupt(void)
 extern void ip_stack_task(void *arg);
 extern void packet_handling_task(void * arg);
 
+__attribute__ ((noreturn))
 void enc28_test_app(ENC28_SPI_Context *ctx)
 {
   ctx->nss_pin_op(1);
@@ -145,5 +146,11 @@ void enc28_test_app(ENC28_SPI_Context *ctx)
   vQueueAddToRegistry(transmit_packet_queue, "transmit_queue");
 
   vTaskStartScheduler();
+
+  {
+	  /* should not enter here.. */
+	  portDISABLE_INTERRUPTS();
+	  while (1);
+  }
 }
 

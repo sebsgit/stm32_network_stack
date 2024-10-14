@@ -63,6 +63,6 @@ extern void enc28_test_app_handle_packet_recv_interrupt(void);
 /*
  * @brief Entry point for the ENC28J60 driver test application. Does not return.
  * */
-extern void enc28_test_app(ENC28_SPI_Context *ctx);
+extern void enc28_test_app(ENC28_SPI_Context *ctx) __attribute__ ((noreturn));
 
 #endif /* STM32_NETWORK_APP_H_ */
