@@ -33,8 +33,27 @@
 
 #include "enc28j60.h"
 
+/* Flag to control the use of lwIP library for the IP stack */
+#define USE_LWIP (1)
+
 /* Maximum number of ethernet packets in use */
 #define MAX_ETH_PACKETS 8
+
+/* MAC address for the ENC28J60 interface, byte 0 */
+#define MAC_ADDR_BYTE_0 0xDE
+/* MAC address for the ENC28J60 interface, byte 1 */
+#define MAC_ADDR_BYTE_1 0xAD
+/* MAC address for the ENC28J60 interface, byte 2 */
+#define MAC_ADDR_BYTE_2 0xBE
+/* MAC address for the ENC28J60 interface, byte 3 */
+#define MAC_ADDR_BYTE_3 0xEF
+/* MAC address for the ENC28J60 interface, byte 4 */
+#define MAC_ADDR_BYTE_4 0xCC
+/* MAC address for the ENC28J60 interface, byte 5 */
+#define MAC_ADDR_BYTE_5 0xAA
+
+/* Static IP address for the ENC28J60 interface [129.168.0.22] */
+#define ENC28_IP_ADDR ((192 << 0) | (168 << 8) | (0 << 16) | (22 << 24))
 
 /*
  * @brief Handles the interrupt from ENC28J60 module. Should be called in the GPIO interrupt handler.
